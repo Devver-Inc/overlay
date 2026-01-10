@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="fr">
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="favicon" href="/favicon.png" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Exemple Simple - Devver Overlay</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
+
+            .container {
+                background: white;
+                border-radius: 16px;
+                padding: 40px;
+                max-width: 600px;
+                width: 100%;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            }
+
+            h1 {
+                color: #111827;
+                margin-bottom: 12px;
+                font-size: 32px;
+            }
+
+            .subtitle {
+                color: #6b7280;
+                margin-bottom: 32px;
+                font-size: 16px;
+            }
+
+            .highlight {
+                background: #dbeafe;
+                border-left: 4px solid #3b82f6;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 24px;
+            }
+
+            .highlight h2 {
+                color: #1e40af;
+                font-size: 18px;
+                margin-bottom: 12px;
+            }
+
+            .highlight p {
+                color: #1e3a8a;
+                line-height: 1.6;
+                margin-bottom: 8px;
+            }
+
+            .code-block {
+                background: #1f2937;
+                color: #e5e7eb;
+                padding: 20px;
+                border-radius: 8px;
+                overflow-x: auto;
+                font-family: "Courier New", monospace;
+                font-size: 14px;
+                line-height: 1.6;
+                margin-bottom: 24px;
+            }
+
+            .code-block .comment {
+                color: #6b7280;
+            }
+
+            .code-block .tag {
+                color: #10b981;
+            }
+
+            .code-block .attr {
+                color: #f59e0b;
+            }
+
+            .arrow {
+                font-size: 24px;
+                color: #667eea;
+                text-align: center;
+                margin: 20px 0;
+            }
+
+            .success-box {
+                background: #d1fae5;
+                border-left: 4px solid #10b981;
+                padding: 20px;
+                border-radius: 8px;
+                color: #065f46;
+            }
+
+            .success-box strong {
+                display: block;
+                margin-bottom: 8px;
+                font-size: 16px;
+            }
+
+            button {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                width: 100%;
+                margin-top: 16px;
+            }
+
+            button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 Devver Overlay - Exemple Simple</h1>
+            <p class="subtitle">Installation en une ligne !</p>
+
+            <div class="highlight">
+                <h2>✨ C'est automatique !</h2>
+                <p><strong>Regardez en bas à droite</strong> 👉</p>
+                <p>Le bouton flottant avec le logo "d" est déjà là ! Il suffit d'importer le script.</p>
+            </div>
+
+            <div class="code-block">
+                <span class="comment">&lt;!-- Dans votre HTML, ajoutez simplement : --&gt;</span>
+                <span class="tag">&lt;script</span> <span class="attr">src</span>=<span class="tag">"dist/devver-overlay.iife.js"</span><span class="tag">&gt;&lt;/script&gt;</span>
+            </div>
+
+            <div class="arrow">⬇️</div>
+
+            <div class="success-box">
+                <strong>✅ Et voilà !</strong>
+                Le bouton apparaît automatiquement en bas à droite. Cliquez dessus pour ouvrir le drawer avec les actions rapides.
+            </div>
+
+            <button onclick="testOverlay()">Tester un overlay depuis la page</button>
+        </div>
+
+        <!-- C'est tout ce qu'il faut ! Le bouton flottant apparaît automatiquement -->
+        <script src="dist/devver-overlay.iife.js"></script>
+
+        <script>
+            function testOverlay() {
+                DevverOverlay.show({
+                    title: "🎉 Ça marche !",
+                    content: `
+                        <p>Vous venez d'ouvrir un overlay depuis votre code JavaScript.</p>
+                        <p style="margin-top: 12px; color: #6b7280;">
+                            Le bouton flottant est toujours accessible en bas à droite.
+                        </p>
+                        <p style="margin-top: 12px; color: #6b7280; font-size: 14px;">
+                            <strong>Astuce :</strong> Cliquez en dehors du drawer pour le fermer !
+                        </p>
+                    `,
+                });
+            }
+
+            console.log("🚀 Devver Overlay chargé !");
+            console.log("👉 Le bouton flottant est en bas à droite");
+            console.log("✨ Le drawer se ferme maintenant quand on clique en dehors !");
+        </script>
+    </body>
+</html>

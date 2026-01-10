@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exemple d'intégration - Devver Overlay</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #111827;
+            margin-bottom: 8px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 32px;
+            font-size: 16px;
+        }
+
+        .section {
+            margin-bottom: 32px;
+        }
+
+        .section h2 {
+            color: #374151;
+            font-size: 20px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-box {
+            background: #f3f4f6;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-box code {
+            background: #1f2937;
+            color: #10b981;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .code-block {
+            background: #1f2937;
+            color: #e5e7eb;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: "Courier New", monospace;
+            font-size: 14px;
+            line-height: 1.8;
+            margin-top: 12px;
+        }
+
+        .code-block .comment {
+            color: #6b7280;
+        }
+
+        .code-block .tag {
+            color: #10b981;
+        }
+
+        .highlight {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 16px;
+            border-radius: 8px;
+            color: #1e3a8a;
+            margin-bottom: 16px;
+        }
+
+        .highlight strong {
+            color: #1e40af;
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 24px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .button-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Exemple d'intégration</h1>
+        <p class="subtitle">Comment utiliser Devver Overlay dans votre projet</p>
+
+        <div class="highlight">
+            <strong>👉 Regardez en</strong> bas à droite !</strong><br>
+            Le bouton flottant Devver est automatiquement apparu. Cliquez dessus pour accéder au drawer.
+        </div>
+
+        <div class="section">
+            <h2>📦 Installation</h2>
+            <p>Pour intégrer Devver Overlay dans votre projet, ajoutez simplement cette ligne dans votre HTML :</p>
+            <div class="code-block">
+<span class="comment">&lt;!-- À la fin de votre balise &lt;body&gt; --&gt;</span>
+<span class="tag">&lt;script</span> src=<span class="tag">"https://www.devver.app/devver-overlay.iife.js"</span><span class="tag">&gt;&lt;/script&gt;</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 Exemples d'utilisation</h2>
+            <p>Testez ces exemples pour voir ce que vous pouvez faire avec Devver Overlay :</p>
+
+            <div class="button-grid">
+                <button onclick="exemple1()">📝 Overlay Simple</button>
+                <button onclick="exemple2()">🎨 Avec Style</button>
+                <button onclick="exemple3()">✨ Contenu Riche</button>
+                <button onclick="exemple4()">⚠️ Confirmation</button>
+                <button onclick="exemple5()">📋 Formulaire</button>
+                <button onclick="exemple6()">🔔 Notification</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>💡 API JavaScript</h2>
+            <div class="info-box">
+                Une fois le script chargé, vous avez accès à l'objet global <code>DevverOverlay</code> avec les méthodes suivantes :
+            </div>
+
+            <div class="code-block">
+<span class="comment">// Afficher un overlay</span>
+DevverOverlay.show({
+    title: 'Mon Titre',
+    content: '&lt;p&gt;Mon contenu HTML&lt;/p&gt;'
+});
+
+<span class="comment">// Fermer l'overlay</span>
+DevverOverlay.close();
+
+<span class="comment">// Vérifier si un overlay est ouvert</span>
+if (DevverOverlay.isOpen()) {
+    console.log('Un overlay est ouvert');
+}
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>⚙️ Options disponibles</h2>
+            <div class="code-block">
+DevverOverlay.show({
+    title: 'Titre',                        <span class="comment">// Optionnel</span>
+    content: '&lt;p&gt;Contenu&lt;/p&gt;', <span class="comment">// HTML accepté</span>
+    closeOnClickOutside: true,             <span class="comment">// Défaut: true</span>
+    showCloseButton: true,                 <span class="comment">// Défaut: true</span>
+    className: 'ma-classe',                <span class="comment">// CSS personnalisé</span>
+    onClose: () => {                       <span class="comment">// Callback</span>
+        console.log('Fermé !');
+    }
+});
+            </div>
+        </div>
+    </div>
+
+    <!-- Devver Overlay - Le bouton apparaît automatiquement ! -->
+    <script src="dist/devver-overlay.iife.js"></script>
+
+    <script>
+        // Exemple 1 : Overlay simple
+        function exemple1() {
+            DevverOverlay.show({
+                content: '<p>Ceci est un overlay simple avec du texte basique.</p>'
+            });
+        }
+
+        // Exemple 2 : Avec style personnalisé
+        function exemple2() {
+            DevverOverlay.show({
+                title: '🎨 Design personnalisé',
+                content: `
+                    <div style="text-align: center; padding: 20px;">
+                        <p style="font-size: 18px; color: #667eea; margin-bottom: 16px;">
+                            Vous pouvez utiliser du HTML et du CSS inline !
+                        </p>
+                        <p style="color: #6b7280;">
+                            Personnalisez vos overlays selon vos besoins.
+                        </p>
+                    </div>
+                `
+            });
+        }
+
+        // Exemple 3 : Contenu riche
+        function exemple3() {
+            DevverOverlay.show({
+                title: '✨ Fonctionnalités',
+                content: `
+                    <div style="padding: 10px;">
+                        <ul style="margin-left: 20px; line-height: 2;">
+                            <li>🚀 Installation en 1 ligne</li>
+                            <li>🎨 Design moderne et responsive</li>
+                            <li>⚡ Léger et performant (13 KB)</li>
+                            <li>📱 Compatible mobile</li>
+                            <li>🔧 Hautement personnalisable</li>
+                            <li>⌨️ Support clavier (Échap)</li>
+                        </ul>
+                    </div>
+                `
+            });
+        }
+
+        // Exemple 4 : Confirmation
+        function exemple4() {
+            DevverOverlay.show({
+                title: '⚠️ Confirmation requise',
+                content: `
+                    <div style="text-align: center;">
+                        <p style="margin-bottom: 20px;">
+                            Êtes-vous sûr de vouloir continuer cette action ?
+                        </p>
+                        <div style="display: flex; gap: 12px; justify-content: center;">
+                            <button onclick="confirmer()"
+                                    style="background: #10b981; padding: 10px 24px; border: none; border-radius: 6px; color: white; cursor: pointer;">
+                                ✓ Confirmer
+                            </button>
+                            <button onclick="DevverOverlay.close()"
+                                    style="background: #6b7280; padding: 10px 24px; border: none; border-radius: 6px; color: white; cursor: pointer;">
+                                ✗ Annuler
+                            </button>
+                        </div>
+                    </div>
+                `,
+                closeOnClickOutside: false
+            });
+        }
+
+        function confirmer() {
+            alert('Action confirmée !');
+            DevverOverlay.close();
+        }
+
+        // Exemple 5 : Formulaire
+        function exemple5() {
+            DevverOverlay.show({
+                title: '📋 Formulaire de contact',
+                content: `
+                    <form onsubmit="soumettreForm(event)" style="padding: 10px;">
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 4px; color: #374151;">Nom</label>
+                            <input type="text" id="nom" required
+                                   style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                        </div>
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 4px; color: #374151;">Email</label>
+                            <input type="email" id="email" required
+                                   style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 4px; color: #374151;">Message</label>
+                            <textarea id="message" rows="4" required
+                                      style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;"></textarea>
+                        </div>
+                        <button type="submit"
+                                style="width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer;">
+                            Envoyer
+                        </button>
+                    </form>
+                `
+            });
+        }
+
+        function soumettreForm(event) {
+            event.preventDefault();
+            const nom = document.getElementById('nom').value;
+            const email = document.getElementById('email').value;
+            const message = document.getElementById('message').value;
+
+            console.log('Formulaire soumis:', { nom, email, message });
+
+            DevverOverlay.close();
+
+            // Afficher une notification de succès
+            setTimeout(() => {
+                DevverOverlay.show({
+                    title: '✅ Message envoyé',
+                    content: '<p style="text-align: center;">Merci ' + nom + ' ! Votre message a été envoyé avec succès.</p>',
+                    onClose: () => {
+                        console.log('Notification fermée');
+                    }
+                });
+            }, 300);
+        }
+
+        // Exemple 6 : Notification
+        function exemple6() {
+            DevverOverlay.show({
+                title: '🔔 Notification',
+                content: `
+                    <div style="text-align: center; padding: 10px;">
+                        <p style="font-size: 16px; margin-bottom: 12px;">
+                            Vous avez reçu une nouvelle notification !
+                        </p>
+                        <p style="color: #6b7280; font-size: 14px;">
+                            Cette notification se fermera dans 3 secondes...
+                        </p>
+                    </div>
+                `
+            });
+
+            // Fermeture automatique après 3 secondes
+            setTimeout(() => {
+                DevverOverlay.close();
+            }, 3000);
+        }
+
+        // Message de bienvenue
+        console.log('🚀 Devver Overlay chargé !');
+        console.log('📖 Utilisez DevverOverlay.show() pour afficher un overlay');
+        console.log('🎨 Consultez les exemples sur cette page');
+    </script>
+</body>
+</html>

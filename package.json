@@ -1,0 +1,28 @@
+{
+  "name": "@devver/overlay",
+  "version": "1.0.0",
+  "description": "Un overlay simple et élégant pour vos projets web",
+  "main": "dist/devver-overlay.iife.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "overlay",
+    "modal",
+    "popup",
+    "dialog",
+    "devver"
+  ],
+  "author": "Devver - Master ESGI",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
+  },
+  "files": [
+    "dist"
+  ]
+}
