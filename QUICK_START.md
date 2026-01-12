@@ -5,10 +5,10 @@ Guide rapide pour intégrer le widget de commentaires Devver.
 ## Installation (1 ligne)
 
 ```html
-<script src="https://votre-cdn.com/devver-overlay.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Devver-Inc/overlay@main/public/devver-overlay.iife.js"></script>
 ```
 
-**C'est tout !** Une toolbar apparaît en bas au centre de la page. ✨
+**C'est tout !** Une toolbar apparaît en bas de la page. ✨
 
 ---
 
@@ -26,8 +26,8 @@ Guide rapide pour intégrer le widget de commentaires Devver.
     <h1>Mon contenu</h1>
     <p>Les utilisateurs peuvent commenter n'importe où sur cette page.</p>
 
-    <!-- Devver Overlay -->
-    <script src="devver-overlay.iife.js"></script>
+    <!-- Devver Overlay via jsDelivr CDN -->
+    <script src="https://cdn.jsdelivr.net/gh/Devver-Inc/overlay@main/public/devver-overlay.iife.js"></script>
 </body>
 </html>
 ```
@@ -38,7 +38,7 @@ Guide rapide pour intégrer le widget de commentaires Devver.
 
 ### 1. La Toolbar
 
-Une barre d'outils apparaît en bas au centre avec 3 boutons :
+Une barre d'outils apparaît en bas avec 3 boutons :
 
 | Icône | Action |
 |-------|--------|
@@ -51,17 +51,17 @@ Une barre d'outils apparaît en bas au centre avec 3 boutons :
 1. Cliquez sur **💬** → le mode commentaire s'active
 2. Un voile blanc apparaît, le curseur devient ✛
 3. Cliquez où vous voulez sur la page
-4. Un formulaire s'ouvre avec votre nom affiché
+4. Le pin apparaît immédiatement, l'éditeur s'ouvre
 5. Écrivez votre commentaire et cliquez **Publier**
-6. Un pin numéroté apparaît à cet endroit
 
 ### 3. Définir son nom
 
 1. Cliquez sur **⚙️** (Paramètres)
 2. Entrez votre nom
-3. Cliquez **Enregistrer**
+3. Choisissez la position de la toolbar
+4. Cliquez **Enregistrer**
 
-> 💡 Le nom est sauvegardé dans le navigateur et apparaît sur tous vos commentaires.
+> 💡 Le nom et la position sont sauvegardés dans le navigateur.
 
 ### 4. Voir les commentaires
 
@@ -69,7 +69,7 @@ Une barre d'outils apparaît en bas au centre avec 3 boutons :
 
 **Option B** : 
 1. Cliquez sur **📋**
-2. La liste de tous les commentaires s'affiche
+2. La liste de tous les commentaires s'affiche dans un drawer
 3. Cliquez sur un commentaire pour y accéder
 
 ### 5. Raccourcis clavier
@@ -154,23 +154,15 @@ DevverOverlay.configureComments({
 }
 ```
 
-### Repositionner la toolbar
+### Repositionner la toolbar via CSS
 
 ```css
 .devver-toolbar {
     bottom: 40px !important;
-    /* ou top: 20px; pour en haut */
 }
 ```
 
-### Masquer un bouton
-
-```css
-/* Masquer le bouton paramètres par exemple */
-.devver-toolbar-btn:nth-child(5) {
-    display: none;
-}
-```
+> 💡 La position de la toolbar peut aussi être changée via les paramètres (⚙️).
 
 ---
 
@@ -196,12 +188,23 @@ Structure d'un commentaire :
 
 ---
 
+## CDN jsDelivr
+
+Le fichier est servi gratuitement via [jsDelivr](https://www.jsdelivr.com/) depuis GitHub :
+
+| Version | URL |
+|---------|-----|
+| Dernière (main) | `https://cdn.jsdelivr.net/gh/Devver-Inc/overlay@main/public/devver-overlay.iife.js` |
+| Tag spécifique | `https://cdn.jsdelivr.net/gh/Devver-Inc/overlay@v1.0.0/public/devver-overlay.iife.js` |
+
+---
+
 ## Compatibilité
 
 ✅ Chrome, Firefox, Safari, Edge (versions récentes)  
 ✅ Mobile (iOS, Android)  
 ✅ Zéro dépendance  
-✅ ~13 KB gzippé
+✅ ~14 KB gzippé
 
 ---
 
@@ -210,6 +213,7 @@ Structure d'un commentaire :
 - 📧 support@devver.app
 - 🌐 https://www.devver.app
 - 📚 Documentation complète : [README.md](./README.md)
+- 🐙 GitHub : [Devver-Inc/overlay](https://github.com/Devver-Inc/overlay)
 
 ---
 

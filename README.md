@@ -6,8 +6,8 @@ Widget de commentaires façon Figma pour annoter n'importe quelle page web. Desi
 
 - 📍 **Pins cliquables** : Posez des commentaires n'importe où sur la page
 - 👤 **Auteur personnalisable** : Chaque commentaire affiche le nom et la date
-- 📋 **Liste des commentaires** : Drawer central listant tous les commentaires
-- ⚙️ **Paramètres** : Panneau pour définir son nom d'utilisateur
+- 📋 **Liste des commentaires** : Drawer latéral listant tous les commentaires
+- ⚙️ **Paramètres** : Panneau pour définir son nom et la position de la toolbar
 - 🎨 **Design dark** : Interface élégante inspirée d'Astro
 - 💾 **Persistance** : Stockage localStorage (API-ready pour backend)
 - ⌨️ **Raccourcis** : Échap pour fermer/annuler
@@ -15,10 +15,10 @@ Widget de commentaires façon Figma pour annoter n'importe quelle page web. Desi
 
 ## 📦 Installation
 
-### CDN / Script
+### CDN (recommandé)
 
 ```html
-<script src="https://votre-cdn.com/devver-overlay.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Devver-Inc/overlay@main/public/devver-overlay.iife.js"></script>
 ```
 
 ### Build local
@@ -32,10 +32,10 @@ npm run build
 ## 🚀 Utilisation
 
 ```html
-<script src="devver-overlay.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/Devver-Inc/overlay@main/public/devver-overlay.iife.js"></script>
 ```
 
-Le widget s'initialise automatiquement avec une **toolbar centrée en bas** de l'écran.
+Le widget s'initialise automatiquement avec une **toolbar en bas** de l'écran.
 
 ### Toolbar
 
@@ -43,14 +43,15 @@ Le widget s'initialise automatiquement avec une **toolbar centrée en bas** de l
 |--------|--------|
 | 💬 | Active/désactive le mode commentaire |
 | 📋 | Ouvre la liste des commentaires |
-| ⚙️ | Ouvre les paramètres (définir son nom) |
+| ⚙️ | Ouvre les paramètres |
 
 ### Ajouter un commentaire
 
 1. Cliquez sur 💬 pour activer le mode commentaire
 2. Un voile blanc apparaît, le curseur devient une croix
 3. Cliquez où vous voulez placer le commentaire
-4. Rédigez votre texte et cliquez "Publier"
+4. Le pin apparaît immédiatement, l'éditeur s'ouvre
+5. Rédigez votre texte et cliquez "Publier"
 
 ### Voir un commentaire
 
