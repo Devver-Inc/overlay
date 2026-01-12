@@ -1,16 +1,14 @@
 # 🚀 Quick Start - Devver Overlay
 
-Guide rapide pour intégrer Devver Overlay dans vos projets.
+Guide rapide pour intégrer le widget de commentaires Devver.
 
-## Installation en 1 ligne
-
-Ajoutez simplement cette ligne dans votre HTML :
+## Installation (1 ligne)
 
 ```html
-<script src="https://www.devver.app/devver-overlay.iife.js"></script>
+<script src="https://votre-cdn.com/devver-overlay.iife.js"></script>
 ```
 
-**C'est tout !** Le bouton flottant avec le logo Devver apparaît automatiquement en bas à droite. ✨
+**C'est tout !** Une toolbar apparaît en bas au centre de la page. ✨
 
 ---
 
@@ -22,217 +20,179 @@ Ajoutez simplement cette ligne dans votre HTML :
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mon Projet avec Devver Overlay</title>
+    <title>Mon site avec Devver</title>
 </head>
 <body>
-    <h1>Bienvenue sur mon site</h1>
-    <p>Mon contenu...</p>
+    <h1>Mon contenu</h1>
+    <p>Les utilisateurs peuvent commenter n'importe où sur cette page.</p>
 
-    <!-- Devver Overlay - s'initialise automatiquement -->
-    <script src="https://www.devver.app/devver-overlay.iife.js"></script>
+    <!-- Devver Overlay -->
+    <script src="devver-overlay.iife.js"></script>
 </body>
 </html>
 ```
 
 ---
 
-## Utilisation de l'API JavaScript
+## Comment ça marche ?
 
-Une fois le script chargé, vous avez accès à l'API globale `DevverOverlay` :
+### 1. La Toolbar
 
-### Afficher un overlay personnalisé
+Une barre d'outils apparaît en bas au centre avec 3 boutons :
 
-```html
-<button onclick="showMyOverlay()">Ouvrir un overlay</button>
+| Icône | Action |
+|-------|--------|
+| 💬 | Mode commentaire |
+| 📋 | Liste des commentaires |
+| ⚙️ | Paramètres |
 
-<script>
-function showMyOverlay() {
-    DevverOverlay.show({
-        title: '👋 Bonjour !',
-        content: '<p>Ceci est un overlay personnalisé.</p>'
-    });
-}
-</script>
+### 2. Ajouter un commentaire
+
+1. Cliquez sur **💬** → le mode commentaire s'active
+2. Un voile blanc apparaît, le curseur devient ✛
+3. Cliquez où vous voulez sur la page
+4. Un formulaire s'ouvre avec votre nom affiché
+5. Écrivez votre commentaire et cliquez **Publier**
+6. Un pin numéroté apparaît à cet endroit
+
+### 3. Définir son nom
+
+1. Cliquez sur **⚙️** (Paramètres)
+2. Entrez votre nom
+3. Cliquez **Enregistrer**
+
+> 💡 Le nom est sauvegardé dans le navigateur et apparaît sur tous vos commentaires.
+
+### 4. Voir les commentaires
+
+**Option A** : Cliquez sur un pin numéroté sur la page
+
+**Option B** : 
+1. Cliquez sur **📋**
+2. La liste de tous les commentaires s'affiche
+3. Cliquez sur un commentaire pour y accéder
+
+### 5. Raccourcis clavier
+
+| Touche | Action |
+|--------|--------|
+| Échap | Ferme le panneau/modal actif |
+| Échap | Annule le mode commentaire |
+
+---
+
+## API JavaScript
+
+### Activer le mode commentaire
+
+```javascript
+DevverOverlay.enableComments();
 ```
 
-### Options disponibles
+### Désactiver le mode commentaire
+
+```javascript
+DevverOverlay.disableComments();
+```
+
+### Définir le nom de l'utilisateur
+
+```javascript
+DevverOverlay.setAuthorName("Jean Dupont");
+```
+
+### Récupérer tous les commentaires
+
+```javascript
+const comments = DevverOverlay.listComments();
+console.log(comments);
+// [{ id, text, author, createdAt, x, y, ... }]
+```
+
+### Afficher un modal personnalisé
 
 ```javascript
 DevverOverlay.show({
-    title: 'Mon Titre',                    // Titre de l'overlay (optionnel)
-    content: '<p>Mon contenu HTML</p>',    // Contenu HTML (optionnel)
-    closeOnClickOutside: true,             // Fermer en cliquant dehors (défaut: true)
-    showCloseButton: true,                 // Afficher le bouton X (défaut: true)
-    className: 'ma-classe-custom',         // Classe CSS personnalisée (optionnel)
-    onClose: () => {                       // Callback appelé à la fermeture
-        console.log('Overlay fermé !');
-    }
+    title: "Information",
+    content: "<p>Votre message ici</p>",
+    closeOnClickOutside: true
 });
 ```
 
-### Autres méthodes
+### Fermer le modal
 
 ```javascript
-// Fermer l'overlay
 DevverOverlay.close();
-
-// Vérifier si un overlay est ouvert
-if (DevverOverlay.isOpen()) {
-    console.log('Un overlay est ouvert');
-}
 ```
 
 ---
 
-## Fonctionnalités automatiques
+## Configuration avancée (API backend)
 
-### Bouton flottant
-- Apparaît automatiquement en bas à droite
-- Affiche le logo Devver
-- Ouvre un drawer avec des actions rapides
-
-### Drawer latéral
-- S'ouvre en cliquant sur le bouton flottant
-- Contient des exemples d'overlays prêts à l'emploi
-- Se ferme en cliquant en dehors ou avec la touche Échap
-
-### Raccourcis clavier
-- **Échap** : Ferme l'overlay ou le drawer ouvert
-
----
-
-## Exemples d'utilisation
-
-### Overlay simple
+Pour connecter à un backend :
 
 ```javascript
-DevverOverlay.show({
-    content: '<p>Message rapide sans titre.</p>'
-});
-```
-
-### Overlay avec titre et contenu riche
-
-```javascript
-DevverOverlay.show({
-    title: '📋 Informations importantes',
-    content: `
-        <div style="padding: 20px;">
-            <h3>Bienvenue !</h3>
-            <ul>
-                <li>Fonctionnalité 1</li>
-                <li>Fonctionnalité 2</li>
-                <li>Fonctionnalité 3</li>
-            </ul>
-            <button onclick="DevverOverlay.close()" 
-                    style="margin-top: 15px; padding: 10px 20px;">
-                Compris !
-            </button>
-        </div>
-    `
-});
-```
-
-### Overlay de confirmation
-
-```javascript
-function confirmerAction() {
-    DevverOverlay.show({
-        title: '⚠️ Confirmation',
-        content: `
-            <p>Êtes-vous sûr de vouloir continuer ?</p>
-            <div style="margin-top: 20px; display: flex; gap: 10px;">
-                <button onclick="effectuerAction()">Oui</button>
-                <button onclick="DevverOverlay.close()">Non</button>
-            </div>
-        `,
-        closeOnClickOutside: false
-    });
-}
-
-function effectuerAction() {
-    console.log('Action effectuée !');
-    DevverOverlay.close();
-}
-```
-
-### Overlay avec callback
-
-```javascript
-DevverOverlay.show({
-    title: 'Notification',
-    content: '<p>Action terminée avec succès !</p>',
-    onClose: () => {
-        // Code exécuté à la fermeture
-        console.log('Utilisateur a fermé la notification');
-        // Redirection, analytics, etc.
-    }
+DevverOverlay.configureComments({
+    mode: "api",
+    baseUrl: "https://api.monsite.com",
+    projectId: "mon-projet",
+    authToken: "mon-token-jwt"
 });
 ```
 
 ---
 
-## Personnalisation CSS
+## Personnalisation
 
-Vous pouvez personnaliser l'apparence avec du CSS :
+### Changer les couleurs
 
 ```css
-/* Changer la position du bouton flottant */
-.devver-floating-button {
-    bottom: 30px !important;
-    left: 30px !important;
-    right: auto !important;
+:root {
+    --devver-accent: #3b82f6;       /* Couleur d'accent (boutons actifs) */
+    --devver-pin: #ef4444;          /* Couleur des pins */
+    --devver-bg-dark: #1a1a2e;      /* Fond de la toolbar */
 }
+```
 
-/* Personnaliser les couleurs du bouton */
-.devver-floating-button {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%) !important;
+### Repositionner la toolbar
+
+```css
+.devver-toolbar {
+    bottom: 40px !important;
+    /* ou top: 20px; pour en haut */
 }
+```
 
-/* Modifier le style du modal */
-.devver-overlay-modal {
-    border-radius: 20px !important;
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4) !important;
-}
+### Masquer un bouton
 
-/* Changer les couleurs du drawer */
-.devver-drawer-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+```css
+/* Masquer le bouton paramètres par exemple */
+.devver-toolbar-btn:nth-child(5) {
+    display: none;
 }
 ```
 
 ---
 
-## Installation en local (développement)
+## Stockage des données
 
-Si vous voulez tester en local avant de déployer :
+Par défaut, les commentaires sont stockés dans le **localStorage** du navigateur, indexés par URL de page.
 
-1. Copiez le fichier `devver-overlay.iife.js` dans votre projet
-2. Importez-le avec un chemin relatif :
-
-```html
-<script src="./js/devver-overlay.iife.js"></script>
+Structure d'un commentaire :
+```json
+{
+    "id": "abc123",
+    "text": "Mon commentaire",
+    "author": "Marie",
+    "createdAt": "2026-01-12T14:30:00.000Z",
+    "x": 450,
+    "y": 800,
+    "pageUrl": "https://monsite.com/page",
+    "anchorSelector": "#section-1",
+    "anchorOffsetX": 0.5,
+    "anchorOffsetY": 0.3
+}
 ```
-
----
-
-## Déploiement sur CDN
-
-### Option 1 : Héberger sur votre serveur
-
-1. Uploadez `devver-overlay.iife.js` sur votre serveur
-2. Utilisez l'URL complète :
-
-```html
-<script src="https://votre-site.com/path/devver-overlay.iife.js"></script>
-```
-
-### Option 2 : Utiliser un CDN gratuit
-
-Vous pouvez utiliser des services comme :
-- **jsDelivr** (via GitHub)
-- **unpkg** (via npm)
-- **Cloudflare Pages**
 
 ---
 
@@ -240,22 +200,17 @@ Vous pouvez utiliser des services comme :
 
 ✅ Chrome, Firefox, Safari, Edge (versions récentes)  
 ✅ Mobile (iOS, Android)  
-✅ Fonctionne sans dépendances externes  
-✅ Taille : ~13 KB (3.2 KB gzippé)
+✅ Zéro dépendance  
+✅ ~13 KB gzippé
 
 ---
 
 ## Support
 
-Pour toute question ou problème :
-- 📧 Contact : support@devver.app
-- 🌐 Site : https://www.devver.app
-- 📚 Documentation complète : Voir README.md
+- 📧 support@devver.app
+- 🌐 https://www.devver.app
+- 📚 Documentation complète : [README.md](./README.md)
 
 ---
 
-## Licence
-
-MIT - Projet Devver - Master ESGI
-
-Fait avec ❤️ pour simplifier vos projets web
+MIT - Projet Devver

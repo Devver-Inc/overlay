@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
   build: {
     lib: {
-      entry: "src/overlay.ts",
+      entry: "src/index.ts",
       name: "DevverOverlay",
       fileName: (format) => `devver-overlay.${format}.js`,
       formats: ["iife", "es", "umd"],
@@ -12,11 +12,12 @@ export default defineConfig({
       output: {
         extend: true,
         globals: {},
+        exports: "named",
       },
     },
     outDir: "dist",
     emptyOutDir: true,
-    minify: "esbuild",
+    minify: false,
     sourcemap: true,
   },
 });
