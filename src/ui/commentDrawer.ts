@@ -33,6 +33,11 @@ export class CommentDrawer {
   private backdrop: HTMLElement | null = null;
   private isOpenState = false;
   private onCloseCallback: CloseHandler | null = null;
+  private readonly container: HTMLElement | ShadowRoot;
+
+  constructor(container: HTMLElement | ShadowRoot) {
+    this.container = container;
+  }
 
   /**
    * Open the drawer with a list of comments
@@ -88,18 +93,16 @@ export class CommentDrawer {
     // Backdrop
     this.backdrop = document.createElement("div");
     this.backdrop.className = "devver-comment-drawer-backdrop";
-    this.backdrop.dataset.devverCommentUi = "true";
     this.backdrop.addEventListener("click", () => {
       this.close();
       this.onCloseCallback?.();
     });
-    document.body.appendChild(this.backdrop);
+    this.container.appendChild(this.backdrop);
 
     // Drawer panel
     this.drawer = document.createElement("div");
     this.drawer.className = "devver-comment-drawer";
-    this.drawer.dataset.devverCommentUi = "true";
-    document.body.appendChild(this.drawer);
+    this.container.appendChild(this.drawer);
   }
 
   /**
@@ -109,10 +112,10 @@ export class CommentDrawer {
     if (!this.drawer) return;
 
     const count = comments.length;
-    const countText = count === 0 
-      ? "Aucun commentaire" 
-      : count === 1 
-        ? "1 commentaire" 
+    const countText = count === 0
+      ? "Aucun commentaire"
+      : count === 1
+        ? "1 commentaire"
         : `${count} commentaires`;
 
     const list = comments
@@ -121,11 +124,11 @@ export class CommentDrawer {
         const author = escapeHtml(comment.author || "Anonyme");
         const date = formatDateShort(comment.createdAt);
         const text = escapeHtml(
-          comment.text.length > 60 
-            ? `${comment.text.slice(0, 57)}...` 
+          comment.text.length > 60
+            ? `${comment.text.slice(0, 57)}...`
             : comment.text
         );
-        
+
         return `
           <button class="devver-comment-drawer-item" data-id="${comment.id}">
             <span class="devver-comment-drawer-num">${num}</span>
@@ -153,7 +156,10 @@ export class CommentDrawer {
 
     // Close button handler
     const closeBtn = this.drawer.querySelector(".devver-comment-drawer-close");
-    closeBtn?.addEventListener("click", () => this.close());
+    closeBtn?.addEventListener("click", () => {
+      this.close();
+      this.onCloseCallback?.();
+    });
 
     // Item click handlers
     const items = this.drawer.querySelectorAll(".devver-comment-drawer-item");

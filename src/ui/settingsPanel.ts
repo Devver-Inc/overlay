@@ -21,8 +21,10 @@ export class SettingsPanel {
   private onChange: ChangeHandler | null = null;
   private onPositionChange: PositionChangeHandler | null = null;
   private onCloseCallback: CloseHandler | null = null;
+  private readonly container: HTMLElement | ShadowRoot;
 
-  constructor() {
+  constructor(container: HTMLElement | ShadowRoot) {
+    this.container = container;
     this.create();
   }
 
@@ -33,17 +35,15 @@ export class SettingsPanel {
     // Create backdrop
     this.backdrop = document.createElement("div");
     this.backdrop.className = "devver-settings-backdrop";
-    this.backdrop.dataset.devverCommentUi = "true";
     this.backdrop.addEventListener("click", () => {
       this.close();
       this.onCloseCallback?.();
     });
-    document.body.appendChild(this.backdrop);
+    this.container.appendChild(this.backdrop);
 
     // Create panel
     this.panel = document.createElement("div");
     this.panel.className = "devver-settings";
-    this.panel.dataset.devverCommentUi = "true";
 
     const savedName = this.getSavedAuthorName();
     const savedPosition = this.getSavedToolbarPosition();
@@ -68,71 +68,72 @@ export class SettingsPanel {
         <div class="devver-settings-field devver-settings-field-position">
           <label class="devver-settings-label">Position de la toolbar</label>
           <div class="devver-settings-position-options">
-            <label class="devver-settings-position-option${savedPosition === "bottom-left" ? " selected" : ""}">
+            <label class="devver-settings-position-option${savedPosition === "bottom-left" ? " devver-selected" : ""}">
               <input type="radio" name="toolbar-position" value="bottom-left" ${savedPosition === "bottom-left" ? "checked" : ""} />
               <span class="devver-settings-position-radio"></span>
               <span>En bas à gauche</span>
             </label>
-            <label class="devver-settings-position-option${savedPosition === "bottom-center" ? " selected" : ""}">
+            <label class="devver-settings-position-option${savedPosition === "bottom-center" ? " devver-selected" : ""}">
               <input type="radio" name="toolbar-position" value="bottom-center" ${savedPosition === "bottom-center" ? "checked" : ""} />
               <span class="devver-settings-position-radio"></span>
               <span>En bas au centre</span>
             </label>
-            <label class="devver-settings-position-option${savedPosition === "bottom-right" ? " selected" : ""}">
+            <label class="devver-settings-position-option${savedPosition === "bottom-right" ? " devver-selected" : ""}">
               <input type="radio" name="toolbar-position" value="bottom-right" ${savedPosition === "bottom-right" ? "checked" : ""} />
               <span class="devver-settings-position-radio"></span>
               <span>En bas à droite</span>
             </label>
           </div>
         </div>
-        <button class="devver-settings-save">Enregistrer</button>
       </div>
     `;
 
     // Close button
     const closeBtn = this.panel.querySelector(".devver-settings-close");
-    closeBtn?.addEventListener("click", () => this.close());
+    closeBtn?.addEventListener("click", () => {
+      this.close();
+      this.onCloseCallback?.();
+    });
 
-    // Position radio buttons - update selected class
+    // Author name input - save on change
+    const input = this.panel.querySelector("#devver-author-name") as HTMLInputElement;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const saveAuthorNameFromInput = () => {
+      const value = input?.value.trim() || "";
+      this.saveAuthorName(value);
+      this.onChange?.(value || "Anonyme");
+    };
+
+    // Debounced save on input
+    input?.addEventListener("input", () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(saveAuthorNameFromInput, 300);
+    });
+
+    // Immediate save on blur
+    input?.addEventListener("blur", () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      saveAuthorNameFromInput();
+    });
+
+    // Position radio buttons - save and apply immediately on change
     const positionOptions = this.panel.querySelectorAll(".devver-settings-position-option");
     positionOptions.forEach((option) => {
       const radio = option.querySelector("input[type='radio']") as HTMLInputElement;
       radio?.addEventListener("change", () => {
-        positionOptions.forEach(opt => opt.classList.remove("selected"));
-        option.classList.add("selected");
+        // Update visual selection
+        positionOptions.forEach(opt => opt.classList.remove("devver-selected"));
+        option.classList.add("devver-selected");
+
+        // Save and apply immediately
+        const position = radio.value as ToolbarPosition;
+        this.saveToolbarPosition(position);
+        this.onPositionChange?.(position);
       });
     });
 
-    // Save button
-    const saveBtn = this.panel.querySelector(".devver-settings-save");
-    const input = this.panel.querySelector("#devver-author-name") as HTMLInputElement;
-
-    saveBtn?.addEventListener("click", () => {
-      // Save author name
-      const value = input?.value.trim() || "";
-      this.saveAuthorName(value);
-      this.onChange?.(value || "Anonyme");
-
-      // Save toolbar position
-      const selectedPosition = this.panel?.querySelector("input[name='toolbar-position']:checked") as HTMLInputElement;
-      if (selectedPosition) {
-        const position = selectedPosition.value as ToolbarPosition;
-        this.saveToolbarPosition(position);
-        this.onPositionChange?.(position);
-      }
-
-      this.close();
-    });
-
-    // Enter key to save
-    input?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        (saveBtn as HTMLButtonElement)?.click();
-      }
-    });
-
-    document.body.appendChild(this.panel);
+    this.container.appendChild(this.panel);
   }
 
   /**
@@ -185,12 +186,12 @@ export class SettingsPanel {
       const radio = option.querySelector("input[type='radio']") as HTMLInputElement;
       if (radio) {
         radio.checked = radio.value === savedPosition;
-        option.classList.toggle("selected", radio.value === savedPosition);
+        option.classList.toggle("devver-selected", radio.value === savedPosition);
       }
     });
 
-    this.backdrop?.classList.add("visible");
-    this.panel?.classList.add("open");
+    this.backdrop?.classList.add("devver-visible");
+    this.panel?.classList.add("devver-open");
     this.isOpenState = true;
 
     // Focus the input
@@ -201,8 +202,8 @@ export class SettingsPanel {
    * Close the settings panel
    */
   public close(): void {
-    this.backdrop?.classList.remove("visible");
-    this.panel?.classList.remove("open");
+    this.backdrop?.classList.remove("devver-visible");
+    this.panel?.classList.remove("devver-open");
     this.isOpenState = false;
   }
 

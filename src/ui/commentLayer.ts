@@ -20,11 +20,10 @@ export class CommentLayer {
   private readonly layer: HTMLElement;
   private previewPin: HTMLElement | null = null;
 
-  constructor() {
+  constructor(container: HTMLElement | ShadowRoot) {
     this.layer = document.createElement("div");
     this.layer.className = "devver-comment-layer";
-    this.layer.dataset.devverCommentUi = "true";
-    document.body.appendChild(this.layer);
+    container.appendChild(this.layer);
   }
 
   /**
@@ -33,7 +32,7 @@ export class CommentLayer {
   public render(items: PinRenderItem[], onPinClick: PinClickHandler): void {
     // Keep the preview pin if it exists
     const existingPreview = this.previewPin;
-    
+
     this.layer.innerHTML = "";
     items.forEach((item) => {
       const pin = this.createPin(item, onPinClick);
@@ -51,14 +50,13 @@ export class CommentLayer {
    */
   public showPreviewPin(x: number, y: number, index: number): void {
     this.removePreviewPin();
-    
+
     this.previewPin = document.createElement("button");
     this.previewPin.className = "devver-comment-pin devver-comment-pin-preview";
-    this.previewPin.dataset.devverCommentUi = "true";
     this.previewPin.style.left = `${x}px`;
     this.previewPin.style.top = `${y}px`;
     this.previewPin.textContent = String(index);
-    
+
     this.layer.appendChild(this.previewPin);
   }
 
@@ -76,7 +74,6 @@ export class CommentLayer {
   private createPin(item: PinRenderItem, onPinClick: PinClickHandler): HTMLElement {
     const pin = document.createElement("button");
     pin.className = "devver-comment-pin";
-    pin.dataset.devverCommentUi = "true";
     pin.style.left = `${item.x}px`;
     pin.style.top = `${item.y}px`;
     pin.title = item.comment.text;

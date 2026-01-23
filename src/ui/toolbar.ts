@@ -21,10 +21,12 @@ export interface ToolbarOptions {
  */
 export class Toolbar {
   private toolbar: HTMLElement | null = null;
-  private buttons: Map<string, HTMLElement> = new Map();
+  private readonly buttons: Map<string, HTMLElement> = new Map();
   private position: ToolbarPosition = "bottom-center";
+  private readonly container: HTMLElement | ShadowRoot;
 
-  constructor() {
+  constructor(container: HTMLElement | ShadowRoot) {
+    this.container = container;
     this.create();
   }
 
@@ -34,8 +36,7 @@ export class Toolbar {
   private create(): void {
     this.toolbar = document.createElement("div");
     this.toolbar.className = "devver-toolbar";
-    this.toolbar.dataset.devverCommentUi = "true";
-    document.body.appendChild(this.toolbar);
+    this.container.appendChild(this.toolbar);
   }
 
   /**
@@ -43,16 +44,16 @@ export class Toolbar {
    */
   public setPosition(position: ToolbarPosition): void {
     if (!this.toolbar) return;
-    
+
     this.position = position;
-    
+
     // Remove all position classes
     this.toolbar.classList.remove(
       "devver-toolbar-bottom-left",
       "devver-toolbar-bottom-center",
       "devver-toolbar-bottom-right"
     );
-    
+
     // Add the new position class
     this.toolbar.classList.add(`devver-toolbar-${position}`);
   }
@@ -115,7 +116,7 @@ export class Toolbar {
   public setActive(id: string, active: boolean): void {
     const button = this.buttons.get(id);
     if (button) {
-      button.classList.toggle("active", active);
+      button.classList.toggle("devver-active", active);
     }
   }
 

@@ -12,6 +12,11 @@ import { calculateModalPosition } from "../utils/position";
 export class Modal {
   private overlay: HTMLElement | null = null;
   private options: OverlayOptions = {};
+  private readonly container: HTMLElement | ShadowRoot;
+
+  constructor(container: HTMLElement | ShadowRoot) {
+    this.container = container;
+  }
 
   /**
    * Show the modal with given options
@@ -76,7 +81,6 @@ export class Modal {
   private createOverlay(): void {
     this.overlay = document.createElement("div");
     this.overlay.className = "devver-overlay";
-    this.overlay.dataset.devverCommentUi = "true";
 
     if (this.options.className) {
       this.overlay.classList.add(this.options.className);
@@ -97,7 +101,7 @@ export class Modal {
     // Modal container
     const modal = this.createModal();
     this.overlay.appendChild(modal);
-    document.body.appendChild(this.overlay);
+    this.container.appendChild(this.overlay);
 
     // Trigger animation
     requestAnimationFrame(() => {

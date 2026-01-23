@@ -10,7 +10,7 @@ import type {
   OverlayOptions,
 } from "../types";
 import { CommentService } from "../services/commentService";
-import { injectStyles } from "../style";
+import { getStyles, injectLightDomStyles } from "../style";
 import { Toolbar } from "../ui/toolbar";
 import { CommentLayer, type PinRenderItem } from "../ui/commentLayer";
 import { CommentEditor } from "../ui/commentEditor";
@@ -27,7 +27,9 @@ import {
   globalScope,
   getScrollPosition,
   getPageUrl,
+  getFullUrl,
   scrollTo,
+  watchUrlChanges,
 } from "./globalScope";
 import {
   isInViewport,
@@ -79,8 +81,13 @@ export class DevverOverlay {
   private commentMode = false;
   private comments: CommentItem[] = [];
   private renderScheduled = false;
-  private readonly pageUrl: string;
+  private pageUrl: string;
+  private currentFullUrl: string;
   private authorName: string;
+
+  // Shadow DOM
+  private readonly shadowHost: HTMLElement;
+  private readonly shadowRoot: ShadowRoot;
 
   // Services
   private readonly commentService: CommentService;
@@ -101,16 +108,30 @@ export class DevverOverlay {
   constructor(config: DevverConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.pageUrl = getPageUrl();
+    this.currentFullUrl = getFullUrl();
+
+    // Create Shadow DOM container
+    this.shadowHost = document.createElement("div");
+    this.shadowHost.id = "devver-overlay-root";
+    // Full viewport coverage but non-interactive - children with pointer-events:auto will still receive clicks
+    this.shadowHost.style.cssText = "position:fixed;inset:0;z-index:2147483647;pointer-events:none;";
+    document.body.appendChild(this.shadowHost);
+
+    // Attach Shadow DOM
+    this.shadowRoot = this.shadowHost.attachShadow({ mode: "open" });
+
+    // Inject styles into Shadow DOM
+    this.injectShadowStyles();
 
     // Initialize services
     this.commentService = new CommentService(this.commentConfig, this.pageUrl);
 
-    // Initialize UI components
-    this.modal = new Modal();
-    this.commentLayer = new CommentLayer();
-    this.commentEditor = new CommentEditor();
-    this.commentDrawer = new CommentDrawer();
-    this.settingsPanel = new SettingsPanel();
+    // Initialize UI components (all render into Shadow DOM)
+    this.modal = new Modal(this.shadowRoot);
+    this.commentLayer = new CommentLayer(this.shadowRoot);
+    this.commentEditor = new CommentEditor(this.shadowRoot);
+    this.commentDrawer = new CommentDrawer(this.shadowRoot);
+    this.settingsPanel = new SettingsPanel(this.shadowRoot);
 
     // Get author name from settings or config
     this.authorName = this.settingsPanel.getAuthorName() || this.config.authorName;
@@ -153,6 +174,19 @@ export class DevverOverlay {
   }
 
   // ============================================
+  // SHADOW DOM SETUP
+  // ============================================
+
+  /**
+   * Inject styles into the Shadow DOM
+   */
+  private injectShadowStyles(): void {
+    const style = document.createElement("style");
+    style.textContent = getStyles();
+    this.shadowRoot.appendChild(style);
+  }
+
+  // ============================================
   // SETUP & INITIALIZATION
   // ============================================
 
@@ -160,7 +194,8 @@ export class DevverOverlay {
    * Setup event listeners and inject styles
    */
   private setup(): void {
-    injectStyles();
+    // Inject light DOM styles (cursor styles that need to affect the host page)
+    injectLightDomStyles();
 
     // Global click handler for comment placement
     document.addEventListener("click", this.handleCommentClick, true);
@@ -172,7 +207,36 @@ export class DevverOverlay {
     globalScope.addEventListener?.("scroll", this.handleScroll, { passive: true });
     globalScope.addEventListener?.("resize", this.handleResize, { passive: true });
 
+    // Watch for URL changes (SPA support)
+    watchUrlChanges(() => this.handleUrlChange());
+
     // Load initial comments
+    void this.loadComments();
+  }
+
+  /**
+   * Handle URL changes (for SPAs with routers)
+   */
+  private handleUrlChange(): void {
+    const newFullUrl = getFullUrl();
+
+    // Only reload if URL actually changed
+    if (newFullUrl === this.currentFullUrl) return;
+
+    this.currentFullUrl = newFullUrl;
+    this.pageUrl = getPageUrl();
+
+    // Close any open UI
+    this.disableComments();
+    this.commentDrawer.close();
+    this.settingsPanel.close();
+    this.modal.close();
+    this.updateToolbarState();
+
+    // Update service with new page URL
+    this.commentService.updatePageUrl(this.pageUrl);
+
+    // Reload comments for the new page
     void this.loadComments();
   }
 
@@ -183,6 +247,27 @@ export class DevverOverlay {
     this.comments = await this.commentService.fetchComments();
     this.renderComments();
     this.updateToolbarBadge();
+
+    // Schedule retries for pins that might not have their anchor elements yet
+    // This handles cases where DOM content loads asynchronously (SPAs, lazy loading)
+    this.schedulePositionRetries();
+  }
+
+  /**
+   * Schedule multiple retries to reposition pins
+   * Useful when DOM elements load asynchronously
+   */
+  private schedulePositionRetries(): void {
+    const retryDelays = [100, 300, 600, 1000, 2000];
+
+    retryDelays.forEach((delay) => {
+      setTimeout(() => {
+        // Only re-render if we still have comments and we're on the same page
+        if (this.comments.length > 0 && getPageUrl() === this.pageUrl) {
+          this.renderComments();
+        }
+      }, delay);
+    });
   }
 
   /**
@@ -191,8 +276,7 @@ export class DevverOverlay {
   private createCommentModeBackdrop(): void {
     this.commentModeBackdrop = document.createElement("div");
     this.commentModeBackdrop.className = "devver-comment-mode-backdrop";
-    this.commentModeBackdrop.dataset.devverCommentUi = "true";
-    document.body.appendChild(this.commentModeBackdrop);
+    this.shadowRoot.appendChild(this.commentModeBackdrop);
   }
 
   // ============================================
@@ -203,7 +287,7 @@ export class DevverOverlay {
    * Create the toolbar with buttons
    */
   private createToolbar(): Toolbar {
-    const toolbar = new Toolbar();
+    const toolbar = new Toolbar(this.shadowRoot);
 
     toolbar.setButtons([
       {
@@ -237,7 +321,7 @@ export class DevverOverlay {
     this.toolbar?.setActive("comment", this.commentMode);
     this.toolbar?.setActive("list", this.commentDrawer.isOpen());
     this.toolbar?.setActive("settings", this.settingsPanel.isOpen());
-    
+
     // Shift toolbar when any drawer is open
     const drawerOpen = this.commentDrawer.isOpen() || this.settingsPanel.isOpen();
     this.toolbar?.setDrawerOpen(drawerOpen);
@@ -314,14 +398,14 @@ export class DevverOverlay {
     if (config) {
       this.configureComments(config);
     }
-    
+
     // Close other panels first
     this.settingsPanel.close();
     this.commentDrawer.close();
-    
+
     this.commentMode = true;
     document.body.classList.add("devver-comment-mode");
-    this.commentModeBackdrop?.classList.add("visible");
+    this.commentModeBackdrop?.classList.add("devver-visible");
     this.updateToolbarState();
   }
 
@@ -334,7 +418,7 @@ export class DevverOverlay {
     this.commentEditor.close();
     this.commentLayer.removePreviewPin();
     document.body.classList.remove("devver-comment-mode");
-    this.commentModeBackdrop?.classList.remove("visible");
+    this.commentModeBackdrop?.classList.remove("devver-visible");
   }
 
   /**
@@ -345,7 +429,7 @@ export class DevverOverlay {
     this.commentMode = false;
     this.updateToolbarState();
     document.body.classList.remove("devver-comment-mode");
-    this.commentModeBackdrop?.classList.remove("visible");
+    this.commentModeBackdrop?.classList.remove("devver-visible");
   }
 
   /**
@@ -401,18 +485,22 @@ export class DevverOverlay {
     if (!this.commentMode) return;
     if (isCommentUi(e.target)) return;
 
+    // Check if click is inside shadow DOM (on our UI elements)
+    const path = e.composedPath();
+    if (path.includes(this.shadowHost)) return;
+
     e.preventDefault();
     e.stopPropagation();
 
     const anchor = buildAnchorData(e);
-    
+
     // Show preview pin immediately
     const previewIndex = this.comments.length + 1;
     this.commentLayer.showPreviewPin(e.clientX, e.clientY, previewIndex);
-    
+
     // Disable comment mode (cursor returns to normal, backdrop disappears)
     this.disableCommentModeVisuals();
-    
+
     this.openCommentEditor(e.clientX, e.clientY, anchor);
   };
 

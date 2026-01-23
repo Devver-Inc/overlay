@@ -63,6 +63,13 @@ export function getPageUrl(): string {
 }
 
 /**
+ * Get current full URL (including hash, for SPA routing)
+ */
+export function getFullUrl(): string {
+  return (globalScope.location?.href as string | undefined) ?? "";
+}
+
+/**
  * Smooth scroll to a position
  */
 export function scrollTo(x: number, y: number): void {
@@ -71,4 +78,39 @@ export function scrollTo(x: number, y: number): void {
   } catch {
     // Ignore scroll failures in restricted environments
   }
+}
+
+/**
+ * Watch for URL changes (works with SPAs using pushState/replaceState)
+ */
+export function watchUrlChanges(callback: () => void): () => void {
+  // Handle browser back/forward
+  const handlePopState = () => callback();
+  globalScope.addEventListener?.("popstate", handlePopState);
+
+  // Intercept pushState and replaceState for SPA routers
+  const originalPushState = history.pushState.bind(history);
+  const originalReplaceState = history.replaceState.bind(history);
+
+  history.pushState = function (...args) {
+    originalPushState(...args);
+    callback();
+  };
+
+  history.replaceState = function (...args) {
+    originalReplaceState(...args);
+    callback();
+  };
+
+  // Handle hash changes
+  const handleHashChange = () => callback();
+  globalScope.addEventListener?.("hashchange", handleHashChange);
+
+  // Return cleanup function
+  return () => {
+    globalScope.removeEventListener?.("popstate", handlePopState);
+    globalScope.removeEventListener?.("hashchange", handleHashChange);
+    history.pushState = originalPushState;
+    history.replaceState = originalReplaceState;
+  };
 }

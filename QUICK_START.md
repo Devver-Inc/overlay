@@ -122,7 +122,7 @@ DevverOverlay.show({
 ### Fermer le modal
 
 ```javascript
-DevverOverlay.close();
+    DevverOverlay.close();
 ```
 
 ---

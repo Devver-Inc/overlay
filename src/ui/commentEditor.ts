@@ -31,6 +31,11 @@ function escapeHtml(text: string): string {
  */
 export class CommentEditor {
   private editor: HTMLElement | null = null;
+  private readonly container: HTMLElement | ShadowRoot;
+
+  constructor(container: HTMLElement | ShadowRoot) {
+    this.container = container;
+  }
 
   /**
    * Open the editor at specified position
@@ -40,7 +45,6 @@ export class CommentEditor {
 
     const editor = document.createElement("div");
     editor.className = "devver-comment-editor";
-    editor.dataset.devverCommentUi = "true";
     editor.style.left = `${options.x}px`;
     editor.style.top = `${options.y}px`;
 
@@ -101,7 +105,7 @@ export class CommentEditor {
       this.close();
     });
 
-    document.body.appendChild(editor);
+    this.container.appendChild(editor);
     this.editor = editor;
 
     // Auto-focus textarea

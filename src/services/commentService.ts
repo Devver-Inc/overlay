@@ -1,7 +1,7 @@
 import type { CommentApiConfig, CommentInput, CommentItem } from "../types";
 
 export class CommentService {
-  private readonly pageUrl: string;
+  private pageUrl: string;
   private config: CommentApiConfig;
 
   constructor(config: CommentApiConfig = {}, pageUrl?: string) {
@@ -14,6 +14,10 @@ export class CommentService {
 
   public updateConfig(config: CommentApiConfig): void {
     this.config = { ...this.config, ...config };
+  }
+
+  public updatePageUrl(pageUrl: string): void {
+    this.pageUrl = pageUrl;
   }
 
   private get storageKey(): string {
