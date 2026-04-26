@@ -7,10 +7,13 @@
 import type {
   CommentApiConfig,
   DevverOverlayAPI,
+  DevverScriptConfig,
   OverlayOptions,
 } from "./types";
 import { DevverOverlay } from "./core/DevverOverlay";
 import { globalScope } from "./core/globalScope";
+
+const DEVVER_API_BASE_URL = "https://app.devver.app/api/v1";
 
 // ============================================
 // SINGLETON INSTANCE
@@ -79,6 +82,19 @@ const api: DevverOverlayAPI = {
 // Expose on global scope
 globalScope.DevverOverlay = api;
 
+// Auto-configure from injected window.__DEVVER__ script tag
+const __DEVVER__ = (globalScope as unknown as { __DEVVER__?: DevverScriptConfig }).__DEVVER__;
+if (__DEVVER__?.projectId) {
+  devverOverlay.configureComments({
+    mode: "api",
+    baseUrl: DEVVER_API_BASE_URL,
+    projectId: __DEVVER__.projectId,
+    repo: __DEVVER__.repo,
+    branch: __DEVVER__.branch,
+    overlayAccessControl: __DEVVER__.overlayAccessControl,
+  });
+}
+
 // ============================================
 // TYPE DECLARATIONS
 // ============================================
@@ -99,6 +115,7 @@ export default devverOverlay;
 export { DevverOverlay } from "./core/DevverOverlay";
 export type {
   DevverConfig,
+  DevverScriptConfig,
   OverlayOptions,
   CommentApiConfig,
   CommentItem,

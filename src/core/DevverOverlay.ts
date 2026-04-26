@@ -544,14 +544,18 @@ export class DevverOverlay {
    * Open the comment editor at a specific position
    */
   private openCommentEditor(clientX: number, clientY: number, anchor: AnchorData): void {
+    const requireEmail =
+      this.commentConfig.overlayAccessControl?.commentPermission === "email_required";
+
     this.commentEditor.open({
       x: clientX,
       y: clientY,
       authorName: this.authorName,
-      onSubmit: async (text) => {
+      requireEmail,
+      onSubmit: async (text, guestEmail) => {
         // Remove preview pin (will be replaced by real pin after save)
         this.commentLayer.removePreviewPin();
-        await this.saveComment(text, anchor);
+        await this.saveComment(text, anchor, guestEmail);
       },
       onCancel: () => {
         // Remove preview pin on cancel
@@ -567,7 +571,7 @@ export class DevverOverlay {
   /**
    * Save a new comment
    */
-  private async saveComment(text: string, anchor: AnchorData): Promise<void> {
+  private async saveComment(text: string, anchor: AnchorData, guestEmail?: string): Promise<void> {
     const comment = await this.commentService.createComment({
       text,
       x: anchor.pageX,
@@ -578,7 +582,7 @@ export class DevverOverlay {
       anchorSelector: anchor.anchorSelector,
       anchorOffsetX: anchor.anchorOffsetX,
       anchorOffsetY: anchor.anchorOffsetY,
-    }, this.authorName);
+    }, this.authorName, guestEmail);
 
     this.comments = [...this.comments, comment];
     this.scheduleRender();

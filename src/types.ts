@@ -12,6 +12,18 @@ export interface OverlayOptions {
   showBackdrop?: boolean;
 }
 
+export interface OverlayAccessControl {
+  commentPermission: "email_required" | "team_only";
+}
+
+export interface DevverScriptConfig {
+  projectId: string;
+  organizationId: string;
+  repo?: string;
+  branch?: string;
+  overlayAccessControl?: OverlayAccessControl;
+}
+
 export interface CommentAuthorConfig {
   /** Default author name for comments */
   authorName?: string;
@@ -40,6 +52,10 @@ export interface CommentApiConfig {
   baseUrl?: string;
   projectId?: string;
   authToken?: string;
+  repo?: string;
+  branch?: string;
+  guestEmail?: string;
+  overlayAccessControl?: OverlayAccessControl;
 }
 
 export interface DevverConfig {
@@ -47,6 +63,12 @@ export interface DevverConfig {
   showButton?: boolean;
   /** Default author name for comments */
   authorName?: string;
+}
+
+declare global {
+  interface Window {
+    __DEVVER__?: DevverScriptConfig;
+  }
 }
 
 export type DevverOverlayAPI = {
