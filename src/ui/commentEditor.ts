@@ -116,8 +116,16 @@ export class CommentEditor {
         submitBtn.textContent = "...";
       }
 
-      await options.onSubmit(value, guestEmail);
-      this.close();
+      try {
+        await options.onSubmit(value, guestEmail);
+        this.close();
+      } catch (error) {
+        console.warn("[DevverOverlay] Unable to submit comment", error);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Publier";
+        }
+      }
     });
 
     this.container.appendChild(editor);

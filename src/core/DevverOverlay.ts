@@ -9,7 +9,11 @@ import type {
   DevverConfig,
   OverlayOptions,
 } from "../types";
-import { CommentService } from "../services/commentService";
+import {
+  CommentApiAuthError,
+  CommentService,
+} from "../services/commentService";
+import { LogtoAuthService } from "../services/logtoAuthService";
 import { getStyles, injectLightDomStyles } from "../style";
 import { Toolbar } from "../ui/toolbar";
 import { CommentLayer, type PinRenderItem } from "../ui/commentLayer";
@@ -41,6 +45,8 @@ const ICONS = {
   comment: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
   list: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`,
   settings: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`,
+  login: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>`,
+  user: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
 };
 
 /** Default configuration */
@@ -91,6 +97,7 @@ export class DevverOverlay {
 
   // Services
   private readonly commentService: CommentService;
+  private readonly authService: LogtoAuthService;
 
   // UI Components
   private readonly modal: Modal;
@@ -124,6 +131,7 @@ export class DevverOverlay {
     this.injectShadowStyles();
 
     // Initialize services
+    this.authService = new LogtoAuthService();
     this.commentService = new CommentService(this.commentConfig, this.pageUrl);
 
     // Initialize UI components (all render into Shadow DOM)
@@ -244,9 +252,21 @@ export class DevverOverlay {
    * Load comments from service
    */
   private async loadComments(): Promise<void> {
-    this.comments = await this.commentService.fetchComments();
-    this.renderComments();
-    this.updateToolbarBadge();
+    try {
+      this.comments = await this.commentService.fetchComments();
+      this.renderComments();
+      this.updateToolbarBadge();
+    } catch (error) {
+      if (error instanceof CommentApiAuthError) {
+        this.comments = [];
+        this.renderComments();
+        this.updateToolbarBadge();
+        this.setToolbarButtons();
+        return;
+      }
+
+      console.warn("[DevverOverlay] Unable to load comments", error);
+    }
 
     // Schedule retries for pins that might not have their anchor elements yet
     // This handles cases where DOM content loads asynchronously (SPAs, lazy loading)
@@ -288,8 +308,17 @@ export class DevverOverlay {
    */
   private createToolbar(): Toolbar {
     const toolbar = new Toolbar(this.shadowRoot);
+    this.setToolbarButtons(toolbar);
+    return toolbar;
+  }
 
-    toolbar.setButtons([
+  /**
+   * Set toolbar buttons according to current auth configuration.
+   */
+  private setToolbarButtons(toolbar = this.toolbar): void {
+    if (!toolbar) return;
+
+    const buttons = [
       {
         id: "comment",
         icon: ICONS.comment,
@@ -309,9 +338,24 @@ export class DevverOverlay {
         label: "Paramètres",
         onClick: () => this.toggleSettings(),
       },
-    ]);
+    ];
 
-    return toolbar;
+    if (this.authService.isConfigured()) {
+      buttons.push({
+        id: "auth",
+        icon: this.authService.isAuthenticated() ? ICONS.user : ICONS.login,
+        label: this.authService.isAuthenticated()
+          ? "Déconnecter Devver"
+          : "Se connecter à Devver",
+        onClick: () => {
+          void this.toggleAuth();
+        },
+      });
+    }
+
+    toolbar.setButtons(buttons);
+    this.updateToolbarState();
+    this.updateToolbarBadge();
   }
 
   /**
@@ -321,6 +365,7 @@ export class DevverOverlay {
     this.toolbar?.setActive("comment", this.commentMode);
     this.toolbar?.setActive("list", this.commentDrawer.isOpen());
     this.toolbar?.setActive("settings", this.settingsPanel.isOpen());
+    this.toolbar?.setActive("auth", this.authService.isAuthenticated());
 
     // Shift toolbar when any drawer is open
     const drawerOpen = this.commentDrawer.isOpen() || this.settingsPanel.isOpen();
@@ -399,6 +444,11 @@ export class DevverOverlay {
       this.configureComments(config);
     }
 
+    if (this.requiresAuthenticatedComments() && !this.authService.isAuthenticated()) {
+      this.requestSignIn();
+      return;
+    }
+
     // Close other panels first
     this.settingsPanel.close();
     this.commentDrawer.close();
@@ -437,8 +487,49 @@ export class DevverOverlay {
    */
   public configureComments(config: CommentApiConfig): void {
     this.commentConfig = { ...this.commentConfig, ...config };
-    this.commentService.updateConfig(this.commentConfig);
-    void this.loadComments();
+    this.authService.configure(
+      this.commentConfig.logto,
+      this.commentConfig.baseUrl,
+      this.commentConfig.organizationId,
+    );
+    this.commentService.updateConfig(this.buildCommentServiceConfig());
+    this.setToolbarButtons();
+    void this.initializeConfiguredComments();
+  }
+
+  private buildCommentServiceConfig(): CommentApiConfig {
+    const requiresAuth = this.requiresAuthenticatedComments();
+    const authTokenProvider =
+      this.commentConfig.authTokenProvider ??
+      (this.authService.isConfigured()
+        ? () =>
+            this.authService.getAccessToken(
+              this.commentConfig.baseUrl,
+              this.commentConfig.organizationId,
+            )
+        : undefined);
+
+    return {
+      ...this.commentConfig,
+      authTokenProvider,
+      requiresAuth,
+    };
+  }
+
+  private async initializeConfiguredComments(): Promise<void> {
+    try {
+      const handledCallback = await this.authService.handleRedirectCallbackIfNeeded();
+      if (handledCallback) {
+        this.applyAuthenticatedAuthorName();
+        this.commentService.updateConfig(this.buildCommentServiceConfig());
+        this.setToolbarButtons();
+      }
+    } catch (error) {
+      console.warn("[DevverOverlay] Logto callback failed", error);
+      this.showAuthMessage("Connexion impossible", "La connexion Logto n'a pas pu être finalisée.");
+    }
+
+    await this.loadComments();
   }
 
   /**
@@ -453,6 +544,66 @@ export class DevverOverlay {
    */
   public setAuthorName(name: string): void {
     this.authorName = name;
+  }
+
+  public async signIn(): Promise<void> {
+    await this.authService.signIn();
+  }
+
+  public async signOut(): Promise<void> {
+    await this.authService.signOut();
+    this.commentService.updateConfig(this.buildCommentServiceConfig());
+    this.setToolbarButtons();
+    await this.loadComments();
+  }
+
+  public isAuthenticated(): boolean {
+    return this.authService.isAuthenticated();
+  }
+
+  private async toggleAuth(): Promise<void> {
+    if (this.authService.isAuthenticated()) {
+      await this.signOut();
+      return;
+    }
+
+    await this.signIn();
+  }
+
+  private requiresAuthenticatedComments(): boolean {
+    return (
+      this.commentConfig.mode === "api" &&
+      this.commentConfig.overlayAccessControl?.commentPermission === "team_only"
+    );
+  }
+
+  private applyAuthenticatedAuthorName(): void {
+    const displayName = this.authService.getUserDisplayName();
+    if (!displayName) return;
+
+    this.authorName = displayName;
+    this.commentEditor.updateAuthorName(displayName);
+  }
+
+  private showAuthMessage(title: string, message: string): void {
+    this.modal.show({
+      title,
+      content: `<p>${escapeHtml(message)}</p>`,
+      closeOnClickOutside: true,
+      showBackdrop: true,
+    });
+  }
+
+  private requestSignIn(): void {
+    if (!this.authService.isConfigured()) {
+      this.showAuthMessage(
+        "Connexion indisponible",
+        "La configuration Logto est manquante pour cet overlay.",
+      );
+      return;
+    }
+
+    void this.signIn();
   }
 
   // ============================================
@@ -572,21 +723,36 @@ export class DevverOverlay {
    * Save a new comment
    */
   private async saveComment(text: string, anchor: AnchorData, guestEmail?: string): Promise<void> {
-    const comment = await this.commentService.createComment({
-      text,
-      x: anchor.pageX,
-      y: anchor.pageY,
-      pageUrl: this.pageUrl,
-      normX: anchor.normX,
-      normY: anchor.normY,
-      anchorSelector: anchor.anchorSelector,
-      anchorOffsetX: anchor.anchorOffsetX,
-      anchorOffsetY: anchor.anchorOffsetY,
-    }, this.authorName, guestEmail);
+    try {
+      const comment = await this.commentService.createComment({
+        text,
+        x: anchor.pageX,
+        y: anchor.pageY,
+        pageUrl: this.pageUrl,
+        normX: anchor.normX,
+        normY: anchor.normY,
+        anchorSelector: anchor.anchorSelector,
+        anchorOffsetX: anchor.anchorOffsetX,
+        anchorOffsetY: anchor.anchorOffsetY,
+      }, this.authorName, guestEmail);
 
-    this.comments = [...this.comments, comment];
-    this.scheduleRender();
-    this.updateToolbarBadge();
+      this.comments = [...this.comments, comment];
+      this.scheduleRender();
+      this.updateToolbarBadge();
+    } catch (error) {
+      if (error instanceof CommentApiAuthError) {
+        this.showAuthMessage(
+          error.code === "access_denied" ? "Accès refusé" : "Connexion requise",
+          error.code === "access_denied"
+            ? "Votre compte n'a pas accès aux commentaires de ce projet."
+            : "Connectez-vous à Devver pour publier un commentaire.",
+        );
+        if (error.code === "auth_required") this.requestSignIn();
+        return;
+      }
+
+      throw error;
+    }
   }
 
   /**
@@ -656,6 +822,11 @@ export class DevverOverlay {
     if (this.commentDrawer.isOpen()) {
       this.commentDrawer.close();
     } else {
+      if (this.requiresAuthenticatedComments() && !this.authService.isAuthenticated()) {
+        this.requestSignIn();
+        return;
+      }
+
       // Close other panels first
       this.disableComments();
       this.settingsPanel.close();

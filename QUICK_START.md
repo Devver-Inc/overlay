@@ -136,9 +136,12 @@ DevverOverlay.configureComments({
     mode: "api",
     baseUrl: "https://api.monsite.com",
     projectId: "mon-projet",
+    organizationId: "org-id",
     authToken: "mon-token-jwt"
 });
 ```
+
+Si la page contient `window.__DEVVER__`, l'overlay lit automatiquement `projectId`, `organizationId`, `repo`, `branch`, `overlayAccessControl`, `apiBaseUrl` et `logto`. En mode `team_only`, il déclenche une connexion Logto avant de lire ou publier des commentaires.
 
 ---
 

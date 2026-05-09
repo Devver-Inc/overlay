@@ -16,11 +16,23 @@ export interface OverlayAccessControl {
   commentPermission: "email_required" | "team_only";
 }
 
+export interface LogtoAuthConfig {
+  endpoint?: string;
+  appId?: string;
+  redirectUri?: string;
+  postLogoutRedirectUri?: string;
+  apiResource?: string;
+  scopes?: string[];
+  resources?: string[];
+}
+
 export interface DevverScriptConfig {
   projectId: string;
   organizationId: string;
   repo?: string;
   branch?: string;
+  apiBaseUrl?: string;
+  logto?: LogtoAuthConfig;
   overlayAccessControl?: OverlayAccessControl;
 }
 
@@ -51,10 +63,14 @@ export interface CommentApiConfig {
   mode?: "local" | "api";
   baseUrl?: string;
   projectId?: string;
+  organizationId?: string;
   authToken?: string;
+  authTokenProvider?: () => Promise<string | undefined>;
+  requiresAuth?: boolean;
   repo?: string;
   branch?: string;
   guestEmail?: string;
+  logto?: LogtoAuthConfig;
   overlayAccessControl?: OverlayAccessControl;
 }
 
@@ -80,4 +96,7 @@ export type DevverOverlayAPI = {
   configureComments: (config: CommentApiConfig) => void;
   listComments: () => CommentItem[];
   setAuthorName: (name: string) => void;
+  signIn: () => Promise<void>;
+  signOut: () => Promise<void>;
+  isAuthenticated: () => boolean;
 };

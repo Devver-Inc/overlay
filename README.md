@@ -77,6 +77,7 @@ DevverOverlay.configureComments({
   mode: "api",                       // "local" (défaut) ou "api"
   baseUrl: "https://api.example.com",
   projectId: "mon-projet",
+  organizationId: "org-id",
   authToken: "bearer-xxx"
 });
 
@@ -85,6 +86,29 @@ DevverOverlay.show({ title: "Info", content: "<p>Hello</p>" });
 DevverOverlay.close();
 DevverOverlay.isOpen();
 ```
+
+### Configuration auto Devver + Logto
+
+Quand le backend injecte `window.__DEVVER__`, l'overlay configure automatiquement l'API commentaires et Logto :
+
+```html
+<script>
+window.__DEVVER__ = {
+  repo: "react",
+  branch: "main",
+  projectId: "project-id",
+  organizationId: "org-id",
+  overlayAccessControl: { commentPermission: "team_only" },
+  apiBaseUrl: "https://app.devver.app/api/v1",
+  logto: {
+    endpoint: "https://auth.devver.app/",
+    appId: "spa-app-id"
+  }
+}
+</script>
+```
+
+Pour `team_only`, l'overlay demande une connexion Logto et utilise un token d'organisation pour lire et publier les commentaires. Pour `email_required`, les invités peuvent continuer à publier avec une adresse email.
 
 ## 🎨 Personnalisation CSS
 

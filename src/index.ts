@@ -14,6 +14,8 @@ import { DevverOverlay } from "./core/DevverOverlay";
 import { globalScope } from "./core/globalScope";
 
 const DEVVER_API_BASE_URL = "https://app.devver.app/api/v1";
+const DEVVER_LOGTO_ENDPOINT = "https://auth.devver.app/";
+const DEVVER_LOGTO_APP_ID = "5snm68ihnddmunh487ee3";
 
 // ============================================
 // SINGLETON INSTANCE
@@ -77,6 +79,21 @@ const api: DevverOverlayAPI = {
    * @param name - The author name to use
    */
   setAuthorName: (name: string) => devverOverlay.setAuthorName(name),
+
+  /**
+   * Start Devver Logto sign-in.
+   */
+  signIn: () => devverOverlay.signIn(),
+
+  /**
+   * Clear Devver overlay session and sign out from Logto when available.
+   */
+  signOut: () => devverOverlay.signOut(),
+
+  /**
+   * Check if the overlay has a Logto refresh token.
+   */
+  isAuthenticated: () => devverOverlay.isAuthenticated(),
 };
 
 // Expose on global scope
@@ -85,12 +102,20 @@ globalScope.DevverOverlay = api;
 // Auto-configure from injected window.__DEVVER__ script tag
 const __DEVVER__ = (globalScope as unknown as { __DEVVER__?: DevverScriptConfig }).__DEVVER__;
 if (__DEVVER__?.projectId) {
+  const baseUrl = __DEVVER__.apiBaseUrl ?? DEVVER_API_BASE_URL;
   devverOverlay.configureComments({
     mode: "api",
-    baseUrl: DEVVER_API_BASE_URL,
+    baseUrl,
     projectId: __DEVVER__.projectId,
+    organizationId: __DEVVER__.organizationId,
     repo: __DEVVER__.repo,
     branch: __DEVVER__.branch,
+    logto: {
+      endpoint: DEVVER_LOGTO_ENDPOINT,
+      appId: DEVVER_LOGTO_APP_ID,
+      apiResource: baseUrl,
+      ...__DEVVER__.logto,
+    },
     overlayAccessControl: __DEVVER__.overlayAccessControl,
   });
 }
@@ -117,6 +142,7 @@ export type {
   DevverConfig,
   DevverScriptConfig,
   OverlayOptions,
+  LogtoAuthConfig,
   CommentApiConfig,
   CommentItem,
   DevverOverlayAPI,

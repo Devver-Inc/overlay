@@ -21,7 +21,20 @@ interface GetCommentDto {
 // Shape of a paginated response from the backend
 interface PaginatedResponse<T> {
   data: T[];
-  totalCount: number;
+  totalCount?: number;
+}
+
+export class CommentApiAuthError extends Error {
+  public readonly code: "auth_required" | "access_denied";
+
+  constructor(
+    code: "auth_required" | "access_denied",
+    message: string,
+  ) {
+    super(message);
+    this.name = "CommentApiAuthError";
+    this.code = code;
+  }
 }
 
 function mapDtoToCommentItem(dto: GetCommentDto): CommentItem {
@@ -83,11 +96,11 @@ export class CommentService {
 
         const url = `${baseUrl}/projects/${encodeURIComponent(projectId as string)}/comments?${params.toString()}`;
         const response = await fetch(url, {
-          headers: this.buildHeaders(),
+          headers: await this.buildHeaders(),
         });
 
         if (!response.ok) {
-          throw new Error(`API error ${response.status}`);
+          throw this.toApiError(response.status);
         }
 
         const data = (await response.json()) as PaginatedResponse<GetCommentDto>;
@@ -96,6 +109,9 @@ export class CommentService {
         // Filter client-side by current pageUrl (backend has no pageUrl filter)
         return allComments.filter((c) => c.pageUrl === this.pageUrl);
       } catch (error) {
+        if (this.config.requiresAuth || error instanceof CommentApiAuthError) {
+          throw error;
+        }
         console.warn("[DevverOverlay] API fetch failed, falling back to local", error);
       }
     }
@@ -138,18 +154,21 @@ export class CommentService {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...this.buildHeaders(),
+            ...(await this.buildHeaders()),
           },
           body: JSON.stringify(body),
         });
 
         if (!response.ok) {
-          throw new Error(`API error ${response.status}`);
+          throw this.toApiError(response.status);
         }
 
         const dto = (await response.json()) as GetCommentDto;
         return mapDtoToCommentItem(dto);
       } catch (error) {
+        if (this.config.requiresAuth || error instanceof CommentApiAuthError) {
+          throw error;
+        }
         console.warn("[DevverOverlay] API save failed, using local storage", error);
       }
     }
@@ -167,12 +186,37 @@ export class CommentService {
     return comment;
   }
 
-  private buildHeaders(): Record<string, string> {
+  private async buildHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {};
-    if (this.config.authToken) {
-      headers.Authorization = `Bearer ${this.config.authToken}`;
+    const token =
+      this.config.authToken ?? (await this.config.authTokenProvider?.());
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    } else if (this.config.requiresAuth) {
+      throw new CommentApiAuthError(
+        "auth_required",
+        "Authentication is required to access comments",
+      );
     }
     return headers;
+  }
+
+  private toApiError(status: number): Error {
+    if (status === 401) {
+      return new CommentApiAuthError(
+        "auth_required",
+        "Authentication is required to access comments",
+      );
+    }
+    if (status === 403) {
+      return new CommentApiAuthError(
+        "access_denied",
+        "You do not have access to these comments",
+      );
+    }
+
+    return new Error(`API error ${status}`);
   }
 
   private readLocal(): CommentItem[] {
