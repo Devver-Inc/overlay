@@ -17,6 +17,22 @@ const DEVVER_API_BASE_URL = "https://app.devver.app/api/v1";
 const DEVVER_LOGTO_ENDPOINT = "https://auth.devver.app/";
 const DEVVER_LOGTO_APP_ID = "5snm68ihnddmunh487ee3";
 
+function getDefaultAuthPortalUrl(baseUrl: string): string {
+  try {
+    const url = new URL(baseUrl);
+    if (
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
+      url.port === "3000"
+    ) {
+      return `${url.protocol}//${url.hostname}:5173/overlay-auth`;
+    }
+
+    return `${url.origin}/overlay-auth`;
+  } catch {
+    return "https://app.devver.app/overlay-auth";
+  }
+}
+
 // ============================================
 // SINGLETON INSTANCE
 // ============================================
@@ -114,6 +130,7 @@ if (__DEVVER__?.projectId) {
       endpoint: DEVVER_LOGTO_ENDPOINT,
       appId: DEVVER_LOGTO_APP_ID,
       apiResource: baseUrl,
+      authPortalUrl: getDefaultAuthPortalUrl(baseUrl),
       ...__DEVVER__.logto,
     },
     overlayAccessControl: __DEVVER__.overlayAccessControl,

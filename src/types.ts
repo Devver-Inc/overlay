@@ -19,6 +19,7 @@ export interface OverlayAccessControl {
 export interface LogtoAuthConfig {
   endpoint?: string;
   appId?: string;
+  authPortalUrl?: string;
   redirectUri?: string;
   postLogoutRedirectUri?: string;
   apiResource?: string;

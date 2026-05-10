@@ -548,6 +548,10 @@ export class DevverOverlay {
 
   public async signIn(): Promise<void> {
     await this.authService.signIn();
+    this.applyAuthenticatedAuthorName();
+    this.commentService.updateConfig(this.buildCommentServiceConfig());
+    this.setToolbarButtons();
+    await this.loadComments();
   }
 
   public async signOut(): Promise<void> {

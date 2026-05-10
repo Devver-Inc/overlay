@@ -102,13 +102,14 @@ window.__DEVVER__ = {
   apiBaseUrl: "https://app.devver.app/api/v1",
   logto: {
     endpoint: "https://auth.devver.app/",
-    appId: "spa-app-id"
+    appId: "spa-app-id",
+    authPortalUrl: "https://app.devver.app/overlay-auth"
   }
 }
 </script>
 ```
 
-Pour `team_only`, l'overlay demande une connexion Logto et utilise un token d'organisation pour lire et publier les commentaires. Pour `email_required`, les invités peuvent continuer à publier avec une adresse email.
+Pour `team_only`, l'overlay ouvre `authPortalUrl` dans un popup, puis cette page Devver renvoie un token d'organisation a l'overlay avec `postMessage`. L'URL `https://app.devver.app/overlay-auth` doit donc etre enregistree dans les redirect URIs Logto de l'application SPA. Pour `email_required`, les invites peuvent continuer a publier avec une adresse email.
 
 ## 🎨 Personnalisation CSS
 

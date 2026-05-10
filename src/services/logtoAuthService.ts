@@ -1,55 +1,26 @@
 import type { LogtoAuthConfig } from "../types";
 
-const DEFAULT_LOGTO_ENDPOINT = "https://auth.devver.app/";
-const DEFAULT_LOGTO_APP_ID = "5snm68ihnddmunh487ee3";
-const ORGANIZATION_RESOURCE = "urn:logto:resource:organizations";
-const ORGANIZATION_SCOPE = "urn:logto:scope:organizations";
-const ORGANIZATION_ROLES_SCOPE = "urn:logto:scope:organization_roles";
 const TOKEN_EXPIRY_MARGIN_SECONDS = 30;
-
-const DEFAULT_SCOPES = [
-  "openid",
-  "offline_access",
-  "profile",
-  "email",
-  "access:api",
-  ORGANIZATION_SCOPE,
-  ORGANIZATION_ROLES_SCOPE,
-];
-
-interface OpenIdConfig {
-  authorization_endpoint: string;
-  token_endpoint: string;
-  end_session_endpoint?: string;
-}
-
-interface TokenResponse {
-  access_token: string;
-  refresh_token?: string;
-  id_token?: string;
-  scope?: string;
-  expires_in?: number;
-  error?: string;
-  error_description?: string;
-}
+const POPUP_WIDTH = 460;
+const POPUP_HEIGHT = 640;
 
 interface StoredAccessToken {
   token: string;
-  scope?: string;
   expiresAt: number;
 }
 
 interface StoredTokens {
-  refreshToken?: string;
-  idToken?: string;
   accessTokens: Record<string, StoredAccessToken>;
+  userName?: string;
 }
 
-interface SignInSession {
-  state: string;
-  codeVerifier: string;
-  redirectUri: string;
-  postRedirectUri: string;
+interface OverlayAuthMessage {
+  type: "devver-overlay-auth";
+  nonce: string;
+  accessToken?: string;
+  expiresAt?: number;
+  userName?: string;
+  error?: string;
 }
 
 export class LogtoAuthError extends Error {
@@ -57,14 +28,6 @@ export class LogtoAuthError extends Error {
     super(message);
     this.name = "LogtoAuthError";
   }
-}
-
-function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/, "");
-}
-
-function unique(values: Array<string | undefined>): string[] {
-  return [...new Set(values.filter(Boolean) as string[])];
 }
 
 function base64UrlEncode(bytes: Uint8Array): string {
@@ -86,13 +49,30 @@ function base64UrlDecode(value: string): string {
   return new TextDecoder().decode(bytes);
 }
 
-function getDefaultRedirectUri(): string {
-  const { origin, pathname } = globalThis.location;
-  return `${origin}${pathname}`;
+function unique(values: Array<string | undefined>): string[] {
+  return [...new Set(values.filter(Boolean) as string[])];
 }
 
-function getCurrentUrl(): string {
-  return globalThis.location.href;
+function buildAccessTokenKey(resource?: string, organizationId?: string): string {
+  return `${resource ?? ""}${organizationId ? `#${organizationId}` : ""}`;
+}
+
+function getTokenStorageKey(appId: string): string {
+  return `devver-logto:${appId}:tokens`;
+}
+
+function toStoredTokens(raw: string | null): StoredTokens {
+  if (!raw) return { accessTokens: {} };
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredTokens>;
+    return {
+      accessTokens: parsed.accessTokens ?? {},
+      userName: parsed.userName,
+    };
+  } catch {
+    return { accessTokens: {} };
+  }
 }
 
 function getTokenExpiry(token: string, fallbackSeconds = 3600): number {
@@ -102,203 +82,108 @@ function getTokenExpiry(token: string, fallbackSeconds = 3600): number {
     const claims = JSON.parse(base64UrlDecode(payload)) as { exp?: number };
     if (typeof claims.exp === "number") return claims.exp;
   } catch {
-    // Fall back to the token response expiry below.
+    // Fall back to the relay-provided expiry below.
   }
 
   return Math.floor(Date.now() / 1000) + fallbackSeconds;
 }
 
-function getTokenStorageKey(appId: string): string {
-  return `devver-logto:${appId}:tokens`;
+function getPopupFeatures(): string {
+  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - POPUP_WIDTH) / 2));
+  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - POPUP_HEIGHT) / 2));
+
+  return [
+    `width=${POPUP_WIDTH}`,
+    `height=${POPUP_HEIGHT}`,
+    `left=${left}`,
+    `top=${top}`,
+    "popup=yes",
+    "resizable=yes",
+    "scrollbars=yes",
+  ].join(",");
 }
 
-function getSessionStorageKey(appId: string): string {
-  return `devver-logto:${appId}:sign-in-session`;
-}
-
-function toStoredTokens(raw: string | null): StoredTokens {
-  if (!raw) return { accessTokens: {} };
-
-  try {
-    const parsed = JSON.parse(raw) as Partial<StoredTokens>;
-    return {
-      refreshToken: parsed.refreshToken,
-      idToken: parsed.idToken,
-      accessTokens: parsed.accessTokens ?? {},
-    };
-  } catch {
-    return { accessTokens: {} };
-  }
-}
-
-function buildAccessTokenKey(resource?: string, organizationId?: string): string {
-  return `${resource ?? ""}${organizationId ? `#${organizationId}` : ""}`;
+function getOrigin(url: string): string {
+  return new URL(url).origin;
 }
 
 export class LogtoAuthService {
   private configured = false;
-  private config: Required<
-    Pick<LogtoAuthConfig, "endpoint" | "appId" | "redirectUri">
-  > &
-    Omit<LogtoAuthConfig, "endpoint" | "appId" | "redirectUri"> = {
-    endpoint: DEFAULT_LOGTO_ENDPOINT,
-    appId: DEFAULT_LOGTO_APP_ID,
-    redirectUri: "",
-    postLogoutRedirectUri: "",
+  private config: LogtoAuthConfig & {
+    appId: string;
+    authPortalUrl: string;
+    apiResource: string;
+    resources: string[];
+  } = {
+    appId: "devver-overlay",
+    authPortalUrl: "",
     apiResource: "",
-    scopes: DEFAULT_SCOPES,
     resources: [],
   };
 
   private organizationId?: string;
-  private oidcConfig: OpenIdConfig | null = null;
+  private signInPromise: Promise<void> | null = null;
 
   public configure(
     config: LogtoAuthConfig | undefined,
     apiResource: string | undefined,
     organizationId: string | undefined,
   ): void {
-    this.configured = Boolean(config);
+    this.configured = Boolean(config?.authPortalUrl);
     if (!this.configured) {
       this.organizationId = undefined;
-      this.oidcConfig = null;
       return;
     }
 
-    const endpoint = config?.endpoint ?? this.config.endpoint;
-    const appId = config?.appId ?? this.config.appId;
     const resolvedApiResource = config?.apiResource ?? apiResource ?? "";
-
     this.config = {
-      endpoint,
-      appId,
-      redirectUri:
-        config?.redirectUri ?? (this.config.redirectUri || getDefaultRedirectUri()),
-      postLogoutRedirectUri:
-        config?.postLogoutRedirectUri ??
-        (this.config.postLogoutRedirectUri || getDefaultRedirectUri()),
+      ...config,
+      appId: config?.appId ?? "devver-overlay",
+      authPortalUrl: config?.authPortalUrl ?? "",
       apiResource: resolvedApiResource,
-      scopes: unique([...(config?.scopes ?? []), ...DEFAULT_SCOPES]),
-      resources: unique([
-        ...(config?.resources ?? []),
-        resolvedApiResource,
-        ORGANIZATION_RESOURCE,
-      ]),
+      resources: unique([...(config?.resources ?? []), resolvedApiResource]),
     };
     this.organizationId = organizationId;
-    this.oidcConfig = null;
   }
 
   public isConfigured(): boolean {
-    return this.configured && Boolean(this.config.endpoint && this.config.appId);
+    return this.configured && Boolean(this.config.authPortalUrl);
   }
 
   public isAuthenticated(): boolean {
-    return this.isConfigured() && Boolean(this.readTokens().refreshToken);
+    if (!this.isConfigured()) return false;
+
+    const key = buildAccessTokenKey(this.config.apiResource, this.organizationId);
+    const cached = this.readTokens().accessTokens[key];
+    const now = Math.floor(Date.now() / 1000);
+
+    return Boolean(cached && cached.expiresAt - TOKEN_EXPIRY_MARGIN_SECONDS > now);
   }
 
   public getUserDisplayName(): string | null {
-    const idToken = this.readTokens().idToken;
-    if (!idToken) return null;
-
-    try {
-      const [, payload] = idToken.split(".");
-      if (!payload) return null;
-      const claims = JSON.parse(base64UrlDecode(payload)) as {
-        name?: string;
-        username?: string;
-        email?: string;
-      };
-      return claims.name ?? claims.username ?? claims.email ?? null;
-    } catch {
-      return null;
-    }
+    return this.readTokens().userName ?? null;
   }
 
   public async handleRedirectCallbackIfNeeded(): Promise<boolean> {
-    if (!this.isConfigured()) return false;
-
-    const url = new URL(getCurrentUrl());
-    const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state");
-    const session = this.readSignInSession();
-
-    if (!code || !state || !session) return false;
-    if (state !== session.state) {
-      this.clearSignInSession();
-      throw new LogtoAuthError("Invalid Logto callback state");
-    }
-
-    try {
-      const oidc = await this.getOidcConfig();
-      const tokenResponse = await this.requestToken(oidc.token_endpoint, {
-        client_id: this.config.appId,
-        code,
-        code_verifier: session.codeVerifier,
-        redirect_uri: session.redirectUri,
-        grant_type: "authorization_code",
-      });
-      this.persistTokenResponse(tokenResponse);
-      return true;
-    } finally {
-      this.clearSignInSession();
-      history.replaceState(history.state, "", session.postRedirectUri);
-    }
+    return false;
   }
 
   public async signIn(): Promise<void> {
     if (!this.isConfigured()) {
-      throw new LogtoAuthError("Logto is not configured");
+      throw new LogtoAuthError("Logto auth portal is not configured");
     }
 
-    const oidc = await this.getOidcConfig();
-    const codeVerifier = this.generateRandomString(64);
-    const state = this.generateRandomString(32);
-    const codeChallenge = await this.createCodeChallenge(codeVerifier);
-    const redirectUri = this.config.redirectUri || getDefaultRedirectUri();
-    const postRedirectUri = getCurrentUrl();
+    if (this.signInPromise) return this.signInPromise;
 
-    this.writeSignInSession({
-      state,
-      codeVerifier,
-      redirectUri,
-      postRedirectUri,
+    this.signInPromise = this.openAuthPopup().finally(() => {
+      this.signInPromise = null;
     });
 
-    const params = new URLSearchParams({
-      client_id: this.config.appId,
-      redirect_uri: redirectUri,
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-      state,
-      response_type: "code",
-      prompt: "consent",
-      scope: this.config.scopes?.join(" ") ?? DEFAULT_SCOPES.join(" "),
-    });
-
-    for (const resource of this.config.resources ?? []) {
-      params.append("resource", resource);
-    }
-
-    globalThis.location.assign(`${oidc.authorization_endpoint}?${params.toString()}`);
+    return this.signInPromise;
   }
 
   public async signOut(): Promise<void> {
     this.clearTokens();
-
-    try {
-      const oidc = await this.getOidcConfig();
-      if (!oidc.end_session_endpoint) return;
-
-      const params = new URLSearchParams({
-        client_id: this.config.appId,
-        post_logout_redirect_uri:
-          this.config.postLogoutRedirectUri || getDefaultRedirectUri(),
-      });
-      globalThis.location.assign(`${oidc.end_session_endpoint}?${params.toString()}`);
-    } catch {
-      // Local token cleanup is enough for the overlay if Logto sign-out is unavailable.
-    }
   }
 
   public async getAccessToken(
@@ -308,34 +193,14 @@ export class LogtoAuthService {
     if (!this.isConfigured()) return undefined;
 
     const key = buildAccessTokenKey(resource, organizationId);
-    const tokens = this.readTokens();
-    const cached = tokens.accessTokens[key];
+    const cached = this.readTokens().accessTokens[key];
     const now = Math.floor(Date.now() / 1000);
 
     if (cached && cached.expiresAt - TOKEN_EXPIRY_MARGIN_SECONDS > now) {
       return cached.token;
     }
 
-    if (!tokens.refreshToken) return undefined;
-
-    try {
-      const oidc = await this.getOidcConfig();
-      const params: Record<string, string> = {
-        client_id: this.config.appId,
-        refresh_token: tokens.refreshToken,
-        grant_type: "refresh_token",
-      };
-      if (resource) params.resource = resource;
-      if (organizationId) params.organization_id = organizationId;
-
-      const tokenResponse = await this.requestToken(oidc.token_endpoint, params);
-      this.persistTokenResponse(tokenResponse, key);
-      return tokenResponse.access_token;
-    } catch (error) {
-      console.warn("[DevverOverlay] Unable to refresh Logto token", error);
-      this.clearTokens();
-      return undefined;
-    }
+    return undefined;
   }
 
   public clearTokens(): void {
@@ -346,58 +211,93 @@ export class LogtoAuthService {
     }
   }
 
-  private async getOidcConfig(): Promise<OpenIdConfig> {
-    if (this.oidcConfig) return this.oidcConfig;
+  private openAuthPopup(): Promise<void> {
+    const nonce = this.generateRandomString(32);
+    const authUrl = this.buildAuthUrl(nonce);
+    const authOrigin = getOrigin(authUrl);
 
-    const endpoint = trimTrailingSlash(this.config.endpoint);
-    const response = await fetch(`${endpoint}/oidc/.well-known/openid-configuration`);
-    if (!response.ok) {
-      throw new LogtoAuthError(`Unable to load Logto discovery: ${response.status}`);
-    }
+    return new Promise((resolve, reject) => {
+      let timeoutId = 0;
+      let intervalId = 0;
+      let popup: Window | null = null;
 
-    const config = (await response.json()) as OpenIdConfig;
-    this.oidcConfig = config;
-    return config;
-  }
+      const cleanup = (): void => {
+        window.clearTimeout(timeoutId);
+        window.clearInterval(intervalId);
+        window.removeEventListener("message", handleMessage);
+      };
 
-  private async requestToken(
-    tokenEndpoint: string,
-    params: Record<string, string>,
-  ): Promise<TokenResponse> {
-    const body = new URLSearchParams(params);
-    const response = await fetch(tokenEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: body.toString(),
+      const handleMessage = (event: MessageEvent<unknown>): void => {
+        if (event.origin !== authOrigin) return;
+
+        const data = event.data as Partial<OverlayAuthMessage>;
+        if (data.type !== "devver-overlay-auth" || data.nonce !== nonce) return;
+
+        cleanup();
+        popup?.close();
+
+        if (data.error || !data.accessToken) {
+          reject(new LogtoAuthError(data.error ?? "Devver sign-in failed"));
+          return;
+        }
+
+        this.persistAccessToken(data.accessToken, data.expiresAt, data.userName);
+        resolve();
+      };
+
+      window.addEventListener("message", handleMessage);
+
+      popup = window.open(authUrl, "devver-overlay-auth", getPopupFeatures());
+      if (!popup) {
+        cleanup();
+        reject(new LogtoAuthError("The browser blocked the Devver sign-in popup"));
+        return;
+      }
+
+      popup.focus();
+      timeoutId = window.setTimeout(() => {
+        cleanup();
+        reject(new LogtoAuthError("Devver sign-in timed out"));
+      }, 120_000);
+      intervalId = window.setInterval(() => {
+        if (popup.closed) {
+          cleanup();
+          reject(new LogtoAuthError("Devver sign-in was closed"));
+        }
+      }, 500);
     });
-
-    const data = (await response.json()) as TokenResponse;
-    if (!response.ok || data.error) {
-      throw new LogtoAuthError(
-        data.error_description ?? data.error ?? `Logto token error ${response.status}`,
-      );
-    }
-
-    return data;
   }
 
-  private persistTokenResponse(response: TokenResponse, accessTokenKey = ""): void {
-    const tokens = this.readTokens();
-    const expiresAt = getTokenExpiry(response.access_token, response.expires_in);
+  private buildAuthUrl(nonce: string): string {
+    const authUrl = new URL(this.config.authPortalUrl);
+    authUrl.searchParams.set("nonce", nonce);
+    authUrl.searchParams.set("targetOrigin", window.location.origin);
 
-    tokens.accessTokens[accessTokenKey] = {
-      token: response.access_token,
-      scope: response.scope,
-      expiresAt,
+    if (this.organizationId) {
+      authUrl.searchParams.set("organizationId", this.organizationId);
+    }
+    if (this.config.apiResource) {
+      authUrl.searchParams.set("resource", this.config.apiResource);
+    }
+
+    return authUrl.toString();
+  }
+
+  private persistAccessToken(
+    accessToken: string,
+    expiresAt: number | undefined,
+    userName: string | undefined,
+  ): void {
+    const key = buildAccessTokenKey(this.config.apiResource, this.organizationId);
+    const tokens = this.readTokens();
+
+    tokens.accessTokens[key] = {
+      token: accessToken,
+      expiresAt: expiresAt ?? getTokenExpiry(accessToken),
     };
 
-    if (response.refresh_token) {
-      tokens.refreshToken = response.refresh_token;
-    }
-    if (response.id_token) {
-      tokens.idToken = response.id_token;
+    if (userName) {
+      tokens.userName = userName;
     }
 
     this.writeTokens(tokens);
@@ -419,43 +319,9 @@ export class LogtoAuthService {
     }
   }
 
-  private readSignInSession(): SignInSession | null {
-    try {
-      const raw = sessionStorage.getItem(getSessionStorageKey(this.config.appId));
-      return raw ? (JSON.parse(raw) as SignInSession) : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private writeSignInSession(session: SignInSession): void {
-    try {
-      sessionStorage.setItem(
-        getSessionStorageKey(this.config.appId),
-        JSON.stringify(session),
-      );
-    } catch {
-      throw new LogtoAuthError("Unable to persist Logto sign-in session");
-    }
-  }
-
-  private clearSignInSession(): void {
-    try {
-      sessionStorage.removeItem(getSessionStorageKey(this.config.appId));
-    } catch {
-      // Ignore storage cleanup failures.
-    }
-  }
-
   private generateRandomString(byteLength: number): string {
     const bytes = new Uint8Array(byteLength);
     crypto.getRandomValues(bytes);
     return base64UrlEncode(bytes);
-  }
-
-  private async createCodeChallenge(codeVerifier: string): Promise<string> {
-    const bytes = new TextEncoder().encode(codeVerifier);
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
-    return base64UrlEncode(new Uint8Array(digest));
   }
 }
