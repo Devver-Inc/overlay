@@ -12,6 +12,7 @@ interface StoredAccessToken {
 interface StoredTokens {
   accessTokens: Record<string, StoredAccessToken>;
   userName?: string;
+  userEmail?: string;
 }
 
 interface OverlayAuthMessage {
@@ -20,6 +21,7 @@ interface OverlayAuthMessage {
   accessToken?: string;
   expiresAt?: number;
   userName?: string;
+  userEmail?: string;
   error?: string;
 }
 
@@ -69,9 +71,29 @@ function toStoredTokens(raw: string | null): StoredTokens {
     return {
       accessTokens: parsed.accessTokens ?? {},
       userName: parsed.userName,
+      userEmail: parsed.userEmail,
     };
   } catch {
     return { accessTokens: {} };
+  }
+}
+
+function isEmailLike(value: string | undefined): value is string {
+  return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
+}
+
+function getTokenEmail(token: string): string | undefined {
+  try {
+    const [, payload] = token.split(".");
+    if (!payload) throw new Error("Missing JWT payload");
+    const claims = JSON.parse(base64UrlDecode(payload)) as {
+      email?: string;
+      primaryEmail?: string;
+    };
+    const email = claims.email ?? claims.primaryEmail;
+    return isEmailLike(email) ? email : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -164,6 +186,20 @@ export class LogtoAuthService {
     return this.readTokens().userName ?? null;
   }
 
+  public getUserEmail(): string | null {
+    if (!this.isAuthenticated()) return null;
+
+    const tokens = this.readTokens();
+    if (isEmailLike(tokens.userEmail)) return tokens.userEmail;
+
+    const key = buildAccessTokenKey(this.config.apiResource, this.organizationId);
+    const tokenEmail = tokens.accessTokens[key]
+      ? getTokenEmail(tokens.accessTokens[key].token)
+      : undefined;
+
+    return tokenEmail ?? null;
+  }
+
   public async handleRedirectCallbackIfNeeded(): Promise<boolean> {
     return false;
   }
@@ -241,7 +277,12 @@ export class LogtoAuthService {
           return;
         }
 
-        this.persistAccessToken(data.accessToken, data.expiresAt, data.userName);
+        this.persistAccessToken(
+          data.accessToken,
+          data.expiresAt,
+          data.userName,
+          data.userEmail,
+        );
         resolve();
       };
 
@@ -287,9 +328,14 @@ export class LogtoAuthService {
     accessToken: string,
     expiresAt: number | undefined,
     userName: string | undefined,
+    userEmail: string | undefined,
   ): void {
     const key = buildAccessTokenKey(this.config.apiResource, this.organizationId);
     const tokens = this.readTokens();
+    const resolvedEmail =
+      (isEmailLike(userEmail) ? userEmail : undefined) ??
+      getTokenEmail(accessToken) ??
+      (isEmailLike(userName) ? userName : undefined);
 
     tokens.accessTokens[key] = {
       token: accessToken,
@@ -298,6 +344,9 @@ export class LogtoAuthService {
 
     if (userName) {
       tokens.userName = userName;
+    }
+    if (resolvedEmail) {
+      tokens.userEmail = resolvedEmail;
     }
 
     this.writeTokens(tokens);

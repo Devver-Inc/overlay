@@ -499,6 +499,7 @@ export class DevverOverlay {
 
   private buildCommentServiceConfig(): CommentApiConfig {
     const requiresAuth = this.requiresAuthenticatedComments();
+    const authenticatedEmail = this.getAuthenticatedCommentEmail();
     const authTokenProvider =
       this.commentConfig.authTokenProvider ??
       (this.authService.isConfigured()
@@ -513,6 +514,7 @@ export class DevverOverlay {
       ...this.commentConfig,
       authTokenProvider,
       requiresAuth,
+      guestEmail: this.commentConfig.guestEmail ?? authenticatedEmail,
     };
   }
 
@@ -578,6 +580,26 @@ export class DevverOverlay {
     return (
       this.commentConfig.mode === "api" &&
       this.commentConfig.overlayAccessControl?.commentPermission === "team_only"
+    );
+  }
+
+  private getAuthenticatedCommentEmail(): string | undefined {
+    if (
+      this.commentConfig.mode !== "api" ||
+      this.commentConfig.overlayAccessControl?.commentPermission !== "email_required" ||
+      !this.authService.isAuthenticated()
+    ) {
+      return undefined;
+    }
+
+    return this.authService.getUserEmail() ?? undefined;
+  }
+
+  private requiresGuestEmailField(): boolean {
+    return (
+      this.commentConfig.overlayAccessControl?.commentPermission === "email_required" &&
+      !this.commentConfig.guestEmail &&
+      !this.getAuthenticatedCommentEmail()
     );
   }
 
@@ -699,8 +721,7 @@ export class DevverOverlay {
    * Open the comment editor at a specific position
    */
   private openCommentEditor(clientX: number, clientY: number, anchor: AnchorData): void {
-    const requireEmail =
-      this.commentConfig.overlayAccessControl?.commentPermission === "email_required";
+    const requireEmail = this.requiresGuestEmailField();
 
     this.commentEditor.open({
       x: clientX,
@@ -728,6 +749,8 @@ export class DevverOverlay {
    */
   private async saveComment(text: string, anchor: AnchorData, guestEmail?: string): Promise<void> {
     try {
+      const resolvedGuestEmail =
+        guestEmail ?? this.commentConfig.guestEmail ?? this.getAuthenticatedCommentEmail();
       const comment = await this.commentService.createComment({
         text,
         x: anchor.pageX,
@@ -738,7 +761,7 @@ export class DevverOverlay {
         anchorSelector: anchor.anchorSelector,
         anchorOffsetX: anchor.anchorOffsetX,
         anchorOffsetY: anchor.anchorOffsetY,
-      }, this.authorName, guestEmail);
+      }, this.authorName, resolvedGuestEmail);
 
       this.comments = [...this.comments, comment];
       this.scheduleRender();
