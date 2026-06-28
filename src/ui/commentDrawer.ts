@@ -25,6 +25,17 @@ function formatDateShort(dateStr: string): string {
   }
 }
 
+function formatPageLabel(pageUrl: string): string {
+  if (!pageUrl) return "";
+
+  try {
+    const url = new URL(pageUrl, window.location.href);
+    return `${url.pathname}${url.search}` || url.hostname;
+  } catch {
+    return pageUrl;
+  }
+}
+
 /**
  * CommentDrawer displays a list of all comments in a centered modal panel
  */
@@ -128,6 +139,7 @@ export class CommentDrawer {
             ? `${comment.text.slice(0, 57)}...`
             : comment.text
         );
+        const pageLabel = escapeHtml(formatPageLabel(comment.pageUrl));
 
         return `
           <button class="devver-comment-drawer-item" data-id="${comment.id}">
@@ -138,6 +150,7 @@ export class CommentDrawer {
                 <span class="devver-comment-drawer-date">${date}</span>
               </div>
               <div class="devver-comment-drawer-text">${text}</div>
+              ${pageLabel ? `<div style="margin-top:4px;font-size:11px;color:var(--devver-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${pageLabel}</div>` : ""}
             </div>
           </button>
         `;
@@ -150,7 +163,7 @@ export class CommentDrawer {
         <button class="devver-comment-drawer-close" aria-label="Fermer">×</button>
       </div>
       <div class="devver-comment-drawer-list">
-        ${count > 0 ? list : '<div class="devver-comment-drawer-empty">Aucun commentaire sur cette page</div>'}
+        ${count > 0 ? list : '<div class="devver-comment-drawer-empty">Aucun commentaire sur ce projet</div>'}
       </div>
     `;
 

@@ -10,6 +10,7 @@ interface CommentEditorOptions {
   x: number;
   y: number;
   authorName: string;
+  lockAuthor?: boolean;
   requireEmail?: boolean;
   onSubmit: SubmitHandler;
   onCancel: CancelHandler;
@@ -67,7 +68,11 @@ export class CommentEditor {
       <form class="devver-comment-editor-form">
         <div class="devver-comment-editor-author">
           <span class="devver-comment-editor-author-label">Publié par</span>
-          <button type="button" class="devver-comment-editor-change-author">
+          <button
+            type="button"
+            class="devver-comment-editor-change-author"
+            ${options.lockAuthor ? 'disabled title="Nom issu de votre compte Devver"' : ""}
+          >
             <span class="devver-comment-editor-author-name">${escapeHtml(options.authorName)}</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
           </button>
@@ -98,6 +103,7 @@ export class CommentEditor {
 
     changeAuthorBtn?.addEventListener("click", (e) => {
       e.preventDefault();
+      if (options.lockAuthor) return;
       options.onChangeAuthor();
     });
 

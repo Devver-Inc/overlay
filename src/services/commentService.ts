@@ -104,10 +104,7 @@ export class CommentService {
         }
 
         const data = (await response.json()) as PaginatedResponse<GetCommentDto>;
-        const allComments = data.data.map(mapDtoToCommentItem);
-
-        // Filter client-side by current pageUrl (backend has no pageUrl filter)
-        return allComments.filter((c) => c.pageUrl === this.pageUrl);
+        return data.data.map(mapDtoToCommentItem);
       } catch (error) {
         if (this.config.requiresAuth || error instanceof CommentApiAuthError) {
           throw error;

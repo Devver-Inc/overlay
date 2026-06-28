@@ -21,6 +21,7 @@ export class SettingsPanel {
   private onChange: ChangeHandler | null = null;
   private onPositionChange: PositionChangeHandler | null = null;
   private onCloseCallback: CloseHandler | null = null;
+  private lockedAuthorName: string | null = null;
   private readonly container: HTMLElement | ShadowRoot;
 
   constructor(container: HTMLElement | ShadowRoot) {
@@ -100,6 +101,7 @@ export class SettingsPanel {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     const saveAuthorNameFromInput = () => {
+      if (this.lockedAuthorName) return;
       const value = input?.value.trim() || "";
       this.saveAuthorName(value);
       this.onChange?.(value || "Anonyme");
@@ -107,12 +109,14 @@ export class SettingsPanel {
 
     // Debounced save on input
     input?.addEventListener("input", () => {
+      if (this.lockedAuthorName) return;
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(saveAuthorNameFromInput, 300);
     });
 
     // Immediate save on blur
     input?.addEventListener("blur", () => {
+      if (this.lockedAuthorName) return;
       if (debounceTimer) clearTimeout(debounceTimer);
       saveAuthorNameFromInput();
     });
@@ -173,11 +177,7 @@ export class SettingsPanel {
    * Open the settings panel
    */
   public open(): void {
-    // Update input value with current saved name
-    const input = this.panel?.querySelector("#devver-author-name") as HTMLInputElement;
-    if (input) {
-      input.value = this.getSavedAuthorName();
-    }
+    const input = this.updateAuthorInput();
 
     // Update position radio buttons
     const savedPosition = this.getSavedToolbarPosition();
@@ -194,8 +194,10 @@ export class SettingsPanel {
     this.panel?.classList.add("devver-open");
     this.isOpenState = true;
 
-    // Focus the input
-    setTimeout(() => input?.focus(), 250);
+    // Focus the input only when the author can be edited.
+    if (input && !input.disabled) {
+      setTimeout(() => input.focus(), 250);
+    }
   }
 
   /**
@@ -236,6 +238,16 @@ export class SettingsPanel {
     }
   }
 
+  public setAuthorLock(name: string): void {
+    this.lockedAuthorName = name;
+    this.updateAuthorInput();
+  }
+
+  public clearAuthorLock(): void {
+    this.lockedAuthorName = null;
+    this.updateAuthorInput();
+  }
+
   /**
    * Save author name to localStorage
    */
@@ -255,7 +267,20 @@ export class SettingsPanel {
    * Get current author name (saved or default)
    */
   public getAuthorName(): string {
-    return this.getSavedAuthorName() || "Anonyme";
+    return this.lockedAuthorName ?? (this.getSavedAuthorName() || "Anonyme");
+  }
+
+  private updateAuthorInput(): HTMLInputElement | null {
+    const input = this.panel?.querySelector("#devver-author-name") as HTMLInputElement | null;
+    if (!input) return null;
+
+    const locked = Boolean(this.lockedAuthorName);
+    input.value = this.lockedAuthorName ?? this.getSavedAuthorName();
+    input.disabled = locked;
+    input.title = locked ? "Nom issu de votre compte Devver" : "";
+    input.setAttribute("aria-disabled", String(locked));
+
+    return input;
   }
 
   /**

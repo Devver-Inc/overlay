@@ -56,6 +56,13 @@ const DEFAULT_CONFIG: Required<DevverConfig> = {
   authorName: "Anonyme",
 };
 
+const PENDING_COMMENT_FOCUS_KEY = "devver-overlay-pending-comment-focus";
+
+interface PendingCommentFocus {
+  commentId: string;
+  pageUrl: string;
+}
+
 /**
  * Format date to readable string
  */
@@ -71,6 +78,17 @@ function formatDate(dateStr: string): string {
     });
   } catch {
     return dateStr;
+  }
+}
+
+function normalizePageUrl(pageUrl: string): string {
+  try {
+    const baseUrl = globalScope.location?.href;
+    const url = baseUrl ? new URL(pageUrl, baseUrl) : new URL(pageUrl);
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return pageUrl.split("#")[0];
   }
 }
 
@@ -146,6 +164,7 @@ export class DevverOverlay {
 
     // Listen for author name changes
     this.settingsPanel.setOnChange((name) => {
+      if (this.authService.isAuthenticated()) return;
       this.authorName = name;
       // Update comment editor if open
       this.commentEditor.updateAuthorName(name);
@@ -256,6 +275,7 @@ export class DevverOverlay {
       this.comments = await this.commentService.fetchComments();
       this.renderComments();
       this.updateToolbarBadge();
+      this.focusPendingCommentIfNeeded();
     } catch (error) {
       if (error instanceof CommentApiAuthError) {
         this.comments = [];
@@ -283,7 +303,7 @@ export class DevverOverlay {
     retryDelays.forEach((delay) => {
       setTimeout(() => {
         // Only re-render if we still have comments and we're on the same page
-        if (this.comments.length > 0 && getPageUrl() === this.pageUrl) {
+        if (this.getCurrentPageComments().length > 0 && getPageUrl() === this.pageUrl) {
           this.renderComments();
         }
       }, delay);
@@ -402,8 +422,9 @@ export class DevverOverlay {
    */
   private renderComments(): void {
     const scroll = getScrollPosition();
+    const pageComments = this.getCurrentPageComments();
 
-    const pins: PinRenderItem[] = this.comments.map((comment, index) => {
+    const pins: PinRenderItem[] = pageComments.map((comment, index) => {
       const pos = resolveAbsolutePosition(comment);
       return {
         comment,
@@ -521,9 +542,14 @@ export class DevverOverlay {
   private async initializeConfiguredComments(): Promise<void> {
     try {
       const handledCallback = await this.authService.handleRedirectCallbackIfNeeded();
-      if (handledCallback) {
+      if (this.authService.isAuthenticated()) {
         this.applyAuthenticatedAuthorName();
         this.commentService.updateConfig(this.buildCommentServiceConfig());
+      } else {
+        this.clearAuthenticatedAuthorName();
+      }
+
+      if (handledCallback) {
         this.setToolbarButtons();
       }
     } catch (error) {
@@ -545,6 +571,7 @@ export class DevverOverlay {
    * Set author name for new comments
    */
   public setAuthorName(name: string): void {
+    if (this.authService.isAuthenticated()) return;
     this.authorName = name;
   }
 
@@ -558,6 +585,7 @@ export class DevverOverlay {
 
   public async signOut(): Promise<void> {
     await this.authService.signOut();
+    this.clearAuthenticatedAuthorName();
     this.commentService.updateConfig(this.buildCommentServiceConfig());
     this.setToolbarButtons();
     await this.loadComments();
@@ -604,11 +632,24 @@ export class DevverOverlay {
   }
 
   private applyAuthenticatedAuthorName(): void {
-    const displayName = this.authService.getUserDisplayName();
-    if (!displayName) return;
+    if (!this.authService.isAuthenticated()) {
+      this.clearAuthenticatedAuthorName();
+      return;
+    }
 
+    const displayName =
+      this.authService.getUserDisplayName() ??
+      this.authService.getUserEmail() ??
+      "Utilisateur Devver";
     this.authorName = displayName;
+    this.settingsPanel.setAuthorLock(displayName);
     this.commentEditor.updateAuthorName(displayName);
+  }
+
+  private clearAuthenticatedAuthorName(): void {
+    this.settingsPanel.clearAuthorLock();
+    this.authorName = this.settingsPanel.getAuthorName() || this.config.authorName;
+    this.commentEditor.updateAuthorName(this.authorName);
   }
 
   private showAuthMessage(title: string, message: string): void {
@@ -672,7 +713,7 @@ export class DevverOverlay {
     const anchor = buildAnchorData(e);
 
     // Show preview pin immediately
-    const previewIndex = this.comments.length + 1;
+    const previewIndex = this.getCurrentPageComments().length + 1;
     this.commentLayer.showPreviewPin(e.clientX, e.clientY, previewIndex);
 
     // Disable comment mode (cursor returns to normal, backdrop disappears)
@@ -727,6 +768,7 @@ export class DevverOverlay {
       x: clientX,
       y: clientY,
       authorName: this.authorName,
+      lockAuthor: this.authService.isAuthenticated(),
       requireEmail,
       onSubmit: async (text, guestEmail) => {
         // Remove preview pin (will be replaced by real pin after save)
@@ -786,6 +828,11 @@ export class DevverOverlay {
    * Focus on a specific comment (scroll to it and show modal)
    */
   private focusComment(comment: CommentItem): void {
+    if (comment.pageUrl && !this.isCommentOnCurrentPage(comment)) {
+      this.navigateToCommentPage(comment);
+      return;
+    }
+
     const pos = resolveAbsolutePosition(comment);
     const scroll = getScrollPosition();
 
@@ -836,6 +883,77 @@ export class DevverOverlay {
       anchorX,
       anchorY,
     });
+  }
+
+  private getCurrentPageComments(): CommentItem[] {
+    return this.comments.filter((comment) => this.isCommentOnCurrentPage(comment));
+  }
+
+  private isCommentOnCurrentPage(comment: CommentItem): boolean {
+    return Boolean(
+      comment.pageUrl &&
+        normalizePageUrl(comment.pageUrl) === normalizePageUrl(this.pageUrl),
+    );
+  }
+
+  private navigateToCommentPage(comment: CommentItem): void {
+    this.savePendingCommentFocus(comment);
+    if (globalScope.location) {
+      globalScope.location.href = comment.pageUrl;
+    }
+  }
+
+  private getPendingCommentFocusKey(): string {
+    return `${PENDING_COMMENT_FOCUS_KEY}:${this.commentConfig.projectId ?? "local"}`;
+  }
+
+  private savePendingCommentFocus(comment: CommentItem): void {
+    try {
+      sessionStorage.setItem(
+        this.getPendingCommentFocusKey(),
+        JSON.stringify({
+          commentId: comment.id,
+          pageUrl: comment.pageUrl,
+        } satisfies PendingCommentFocus),
+      );
+    } catch {
+      // sessionStorage may be unavailable in restricted browser contexts.
+    }
+  }
+
+  private readPendingCommentFocus(): PendingCommentFocus | null {
+    try {
+      const raw = sessionStorage.getItem(this.getPendingCommentFocusKey());
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Partial<PendingCommentFocus>;
+      if (!parsed.commentId || !parsed.pageUrl) return null;
+      return {
+        commentId: parsed.commentId,
+        pageUrl: parsed.pageUrl,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private clearPendingCommentFocus(): void {
+    try {
+      sessionStorage.removeItem(this.getPendingCommentFocusKey());
+    } catch {
+      // sessionStorage may be unavailable in restricted browser contexts.
+    }
+  }
+
+  private focusPendingCommentIfNeeded(): void {
+    const pending = this.readPendingCommentFocus();
+    if (!pending) return;
+    if (normalizePageUrl(pending.pageUrl) !== normalizePageUrl(this.pageUrl)) return;
+
+    const comment = this.comments.find((item) => item.id === pending.commentId);
+    if (!comment || !this.isCommentOnCurrentPage(comment)) return;
+
+    this.clearPendingCommentFocus();
+    setTimeout(() => this.focusComment(comment), 250);
   }
 
   // ============================================
