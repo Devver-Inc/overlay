@@ -15,7 +15,7 @@ import {
 } from "../services/commentService";
 import { LogtoAuthService } from "../services/logtoAuthService";
 import { getStyles, injectLightDomStyles } from "../style";
-import { Toolbar } from "../ui/toolbar";
+import { Toolbar, type ToolbarButton } from "../ui/toolbar";
 import { CommentLayer, type PinRenderItem } from "../ui/commentLayer";
 import { CommentEditor } from "../ui/commentEditor";
 import { CommentDrawer } from "../ui/commentDrawer";
@@ -48,6 +48,9 @@ const ICONS = {
   login: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>`,
   user: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
 };
+
+const DEVVER_LOGO_WHITE_URL = "https://app.devver.app/logo.png";
+const DEVVER_LOGO_BLACK_URL = "https://app.devver.app/favicon.png";
 
 /** Default configuration */
 const DEFAULT_CONFIG: Required<DevverConfig> = {
@@ -90,6 +93,18 @@ function normalizePageUrl(pageUrl: string): string {
   } catch {
     return pageUrl.split("#")[0];
   }
+}
+
+function buildAuthButtonContent(isAuthenticated: boolean): string {
+  const logoUrl = isAuthenticated ? DEVVER_LOGO_BLACK_URL : DEVVER_LOGO_WHITE_URL;
+  const text = isAuthenticated ? "Logout" : "Login";
+
+  return `
+    <span class="devver-toolbar-auth-content">
+      <img class="devver-toolbar-auth-logo" src="${logoUrl}" alt="" aria-hidden="true" />
+      <span class="devver-toolbar-auth-text">${text}</span>
+    </span>
+  `;
 }
 
 /**
@@ -338,7 +353,7 @@ export class DevverOverlay {
   private setToolbarButtons(toolbar = this.toolbar): void {
     if (!toolbar) return;
 
-    const buttons = [
+    const buttons: ToolbarButton[] = [
       {
         id: "comment",
         icon: ICONS.comment,
@@ -361,12 +376,12 @@ export class DevverOverlay {
     ];
 
     if (this.authService.isConfigured()) {
+      const isAuthenticated = this.authService.isAuthenticated();
       buttons.push({
         id: "auth",
-        icon: this.authService.isAuthenticated() ? ICONS.user : ICONS.login,
-        label: this.authService.isAuthenticated()
-          ? "Déconnecter Devver"
-          : "Se connecter à Devver",
+        icon: buildAuthButtonContent(isAuthenticated),
+        label: isAuthenticated ? "Logout Devver" : "Login Devver",
+        className: "devver-toolbar-btn-auth",
         onClick: () => {
           void this.toggleAuth();
         },

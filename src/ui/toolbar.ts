@@ -9,6 +9,7 @@ export interface ToolbarButton {
   icon: string;
   label: string;
   onClick: () => void;
+  className?: string;
   badge?: number;
 }
 
@@ -94,6 +95,9 @@ export class Toolbar {
   private createButton(config: ToolbarButton): HTMLElement {
     const button = document.createElement("button");
     button.className = "devver-toolbar-btn";
+    if (config.className) {
+      button.classList.add(config.className);
+    }
     button.setAttribute("aria-label", config.label);
     button.title = config.label;
     button.innerHTML = config.icon;
