@@ -13,6 +13,7 @@ interface StoredTokens {
   accessTokens: Record<string, StoredAccessToken>;
   userName?: string;
   userEmail?: string;
+  profileExpiresAt?: number;
 }
 
 interface OverlayAuthMessage {
@@ -22,13 +23,27 @@ interface OverlayAuthMessage {
   expiresAt?: number;
   userName?: string;
   userEmail?: string;
+  profileOnly?: boolean;
+  errorCode?: string;
   error?: string;
 }
 
+export type LogtoAuthErrorCode =
+  | "not_configured"
+  | "organization_access_denied"
+  | "token_unavailable"
+  | "popup_blocked"
+  | "popup_closed"
+  | "timeout"
+  | "unknown_error";
+
 export class LogtoAuthError extends Error {
-  constructor(message: string) {
+  public readonly code: LogtoAuthErrorCode;
+
+  constructor(message: string, code: LogtoAuthErrorCode = "unknown_error") {
     super(message);
     this.name = "LogtoAuthError";
+    this.code = code;
   }
 }
 
@@ -72,6 +87,7 @@ function toStoredTokens(raw: string | null): StoredTokens {
       accessTokens: parsed.accessTokens ?? {},
       userName: parsed.userName,
       userEmail: parsed.userEmail,
+      profileExpiresAt: parsed.profileExpiresAt,
     };
   } catch {
     return { accessTokens: {} };
@@ -129,6 +145,37 @@ function getOrigin(url: string): string {
   return new URL(url).origin;
 }
 
+function isLogtoAuthErrorCode(
+  value: string | undefined,
+): value is LogtoAuthErrorCode {
+  return (
+    value === "not_configured" ||
+    value === "organization_access_denied" ||
+    value === "token_unavailable" ||
+    value === "popup_blocked" ||
+    value === "popup_closed" ||
+    value === "timeout" ||
+    value === "unknown_error"
+  );
+}
+
+function resolveAuthErrorCode(
+  errorCode: string | undefined,
+  error: string | undefined,
+  organizationId: string | undefined,
+): LogtoAuthErrorCode {
+  if (isLogtoAuthErrorCode(errorCode)) return errorCode;
+
+  if (
+    organizationId &&
+    error?.toLowerCase().includes("logto access token")
+  ) {
+    return "organization_access_denied";
+  }
+
+  return "unknown_error";
+}
+
 export class LogtoAuthService {
   private configured = false;
   private config: LogtoAuthConfig & {
@@ -175,11 +222,20 @@ export class LogtoAuthService {
   public isAuthenticated(): boolean {
     if (!this.isConfigured()) return false;
 
+    const tokens = this.readTokens();
     const key = buildAccessTokenKey(this.config.apiResource, this.organizationId);
-    const cached = this.readTokens().accessTokens[key];
+    const cached = tokens.accessTokens[key];
     const now = Math.floor(Date.now() / 1000);
 
-    return Boolean(cached && cached.expiresAt - TOKEN_EXPIRY_MARGIN_SECONDS > now);
+    if (cached && cached.expiresAt - TOKEN_EXPIRY_MARGIN_SECONDS > now) {
+      return true;
+    }
+
+    return Boolean(
+      !this.organizationId &&
+        tokens.profileExpiresAt &&
+        tokens.profileExpiresAt - TOKEN_EXPIRY_MARGIN_SECONDS > now,
+    );
   }
 
   public getUserDisplayName(): string | null {
@@ -206,7 +262,10 @@ export class LogtoAuthService {
 
   public async signIn(): Promise<void> {
     if (!this.isConfigured()) {
-      throw new LogtoAuthError("Logto auth portal is not configured");
+      throw new LogtoAuthError(
+        "Logto auth portal is not configured",
+        "not_configured",
+      );
     }
 
     if (this.signInPromise) return this.signInPromise;
@@ -273,7 +332,28 @@ export class LogtoAuthService {
         popup?.close();
 
         if (data.error || !data.accessToken) {
-          reject(new LogtoAuthError(data.error ?? "Devver sign-in failed"));
+          if (data.profileOnly && !data.error) {
+            this.persistProfileSession(
+              data.expiresAt,
+              data.userName,
+              data.userEmail,
+            );
+            resolve();
+            return;
+          }
+
+          const errorCode = resolveAuthErrorCode(
+            data.errorCode ?? (!data.accessToken ? "token_unavailable" : undefined),
+            data.error,
+            this.organizationId,
+          );
+
+          reject(
+            new LogtoAuthError(
+              data.error ?? "Devver sign-in failed",
+              errorCode,
+            ),
+          );
           return;
         }
 
@@ -291,19 +371,24 @@ export class LogtoAuthService {
       popup = window.open(authUrl, "devver-overlay-auth", getPopupFeatures());
       if (!popup) {
         cleanup();
-        reject(new LogtoAuthError("The browser blocked the Devver sign-in popup"));
+        reject(
+          new LogtoAuthError(
+            "The browser blocked the Devver sign-in popup",
+            "popup_blocked",
+          ),
+        );
         return;
       }
 
       popup.focus();
       timeoutId = window.setTimeout(() => {
         cleanup();
-        reject(new LogtoAuthError("Devver sign-in timed out"));
+        reject(new LogtoAuthError("Devver sign-in timed out", "timeout"));
       }, 120_000);
       intervalId = window.setInterval(() => {
         if (popup.closed) {
           cleanup();
-          reject(new LogtoAuthError("Devver sign-in was closed"));
+          reject(new LogtoAuthError("Devver sign-in was closed", "popup_closed"));
         }
       }, 500);
     });
@@ -341,6 +426,29 @@ export class LogtoAuthService {
       token: accessToken,
       expiresAt: expiresAt ?? getTokenExpiry(accessToken),
     };
+
+    if (userName) {
+      tokens.userName = userName;
+    }
+    if (resolvedEmail) {
+      tokens.userEmail = resolvedEmail;
+    }
+
+    this.writeTokens(tokens);
+  }
+
+  private persistProfileSession(
+    expiresAt: number | undefined,
+    userName: string | undefined,
+    userEmail: string | undefined,
+  ): void {
+    const tokens = this.readTokens();
+    const resolvedEmail =
+      (isEmailLike(userEmail) ? userEmail : undefined) ??
+      (isEmailLike(userName) ? userName : undefined);
+
+    tokens.profileExpiresAt =
+      expiresAt ?? Math.floor(Date.now() / 1000) + 3600;
 
     if (userName) {
       tokens.userName = userName;

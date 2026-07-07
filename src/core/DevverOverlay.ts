@@ -13,7 +13,10 @@ import {
   CommentApiAuthError,
   CommentService,
 } from "../services/commentService";
-import { LogtoAuthService } from "../services/logtoAuthService";
+import {
+  LogtoAuthError,
+  LogtoAuthService,
+} from "../services/logtoAuthService";
 import { getStyles, injectLightDomStyles } from "../style";
 import { Toolbar, type ToolbarButton } from "../ui/toolbar";
 import { CommentLayer, type PinRenderItem } from "../ui/commentLayer";
@@ -297,6 +300,13 @@ export class DevverOverlay {
         this.renderComments();
         this.updateToolbarBadge();
         this.setToolbarButtons();
+        if (
+          error.code === "access_denied" &&
+          this.requiresAuthenticatedComments() &&
+          this.authService.isAuthenticated()
+        ) {
+          this.showProjectAccessDeniedMessage();
+        }
         return;
       }
 
@@ -526,7 +536,7 @@ export class DevverOverlay {
     this.authService.configure(
       this.commentConfig.logto,
       this.commentConfig.baseUrl,
-      this.commentConfig.organizationId,
+      this.getAuthOrganizationId(),
     );
     this.commentService.updateConfig(this.buildCommentServiceConfig());
     this.setToolbarButtons();
@@ -542,7 +552,7 @@ export class DevverOverlay {
         ? () =>
             this.authService.getAccessToken(
               this.commentConfig.baseUrl,
-              this.commentConfig.organizationId,
+              this.getAuthOrganizationId(),
             )
         : undefined);
 
@@ -611,12 +621,16 @@ export class DevverOverlay {
   }
 
   private async toggleAuth(): Promise<void> {
-    if (this.authService.isAuthenticated()) {
-      await this.signOut();
-      return;
-    }
+    try {
+      if (this.authService.isAuthenticated()) {
+        await this.signOut();
+        return;
+      }
 
-    await this.signIn();
+      await this.signIn();
+    } catch (error) {
+      this.showSignInError(error);
+    }
   }
 
   private requiresAuthenticatedComments(): boolean {
@@ -624,6 +638,12 @@ export class DevverOverlay {
       this.commentConfig.mode === "api" &&
       this.commentConfig.overlayAccessControl?.commentPermission === "team_only"
     );
+  }
+
+  private getAuthOrganizationId(): string | undefined {
+    return this.requiresAuthenticatedComments()
+      ? this.commentConfig.organizationId
+      : undefined;
   }
 
   private getAuthenticatedCommentEmail(): string | undefined {
@@ -676,6 +696,72 @@ export class DevverOverlay {
     });
   }
 
+  private showOrganizationAccessDeniedMessage(): void {
+    this.showAuthMessage(
+      "Accès organisation refusé",
+      "Vous n'êtes pas dans l'organisation Devver associée à ce projet. Demandez à un administrateur de l'organisation de vous ajouter, puis réessayez.",
+    );
+  }
+
+  private showProjectAccessDeniedMessage(): void {
+    this.showAuthMessage(
+      "Accès projet refusé",
+      "Vous êtes connecté à Devver, mais votre compte n'est pas associé à ce projet. Demandez à un administrateur du projet de vous ajouter à l'équipe.",
+    );
+  }
+
+  private showSignInError(error: unknown): void {
+    if (error instanceof LogtoAuthError) {
+      switch (error.code) {
+        case "organization_access_denied":
+          this.showOrganizationAccessDeniedMessage();
+          return;
+        case "token_unavailable":
+          this.showAuthMessage(
+            "Connexion incomplète",
+            "Devver n'a pas pu récupérer le token d'accès pour ce projet. Vérifiez que votre compte a accès à l'organisation Devver associée.",
+          );
+          return;
+        case "popup_blocked":
+          this.showAuthMessage(
+            "Popup bloqué",
+            "Votre navigateur a bloqué la fenêtre de connexion Devver. Autorisez les popups pour cette page, puis réessayez.",
+          );
+          return;
+        case "popup_closed":
+          this.showAuthMessage(
+            "Connexion annulée",
+            "La fenêtre de connexion Devver a été fermée avant la fin de l'authentification.",
+          );
+          return;
+        case "timeout":
+          this.showAuthMessage(
+            "Connexion expirée",
+            "La connexion Devver a pris trop de temps. Réessayez depuis le bouton Login.",
+          );
+          return;
+        case "not_configured":
+          this.showAuthMessage(
+            "Connexion indisponible",
+            "La configuration Logto est manquante pour cet overlay.",
+          );
+          return;
+        default:
+          this.showAuthMessage(
+            "Connexion impossible",
+            "La connexion Devver n'a pas pu être finalisée.",
+          );
+          return;
+      }
+    }
+
+    console.warn("[DevverOverlay] Sign-in failed", error);
+    this.showAuthMessage(
+      "Connexion impossible",
+      "La connexion Devver n'a pas pu être finalisée.",
+    );
+  }
+
   private requestSignIn(): void {
     if (!this.authService.isConfigured()) {
       this.showAuthMessage(
@@ -685,7 +771,7 @@ export class DevverOverlay {
       return;
     }
 
-    void this.signIn();
+    void this.signIn().catch((error) => this.showSignInError(error));
   }
 
   // ============================================
@@ -825,12 +911,16 @@ export class DevverOverlay {
       this.updateToolbarBadge();
     } catch (error) {
       if (error instanceof CommentApiAuthError) {
-        this.showAuthMessage(
-          error.code === "access_denied" ? "Accès refusé" : "Connexion requise",
-          error.code === "access_denied"
-            ? "Votre compte n'a pas accès aux commentaires de ce projet."
-            : "Connectez-vous à Devver pour publier un commentaire.",
-        );
+        if (error.code === "access_denied" && this.requiresAuthenticatedComments()) {
+          this.showProjectAccessDeniedMessage();
+        } else {
+          this.showAuthMessage(
+            error.code === "access_denied" ? "Accès refusé" : "Connexion requise",
+            error.code === "access_denied"
+              ? "Votre compte n'a pas accès aux commentaires de ce projet."
+              : "Connectez-vous à Devver pour publier un commentaire.",
+          );
+        }
         if (error.code === "auth_required") this.requestSignIn();
         return;
       }
