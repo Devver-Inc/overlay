@@ -20,6 +20,67 @@ function escapeCss(value: string): string {
 }
 
 /**
+ * Return the element matched by a selector only when it is unique on the page.
+ * Invalid or ambiguous selectors must never be used as anchors.
+ */
+function getUniqueElement(selector: string): Element | null {
+  try {
+    const matches = document.querySelectorAll(selector);
+    return matches.length === 1 ? matches.item(0) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check that a selector uniquely identifies the expected element.
+ */
+function isUniqueSelectorFor(selector: string, element: Element): boolean {
+  return getUniqueElement(selector) === element;
+}
+
+/**
+ * Find a stable selector for an element when one is globally unique.
+ */
+function getStableSelector(element: HTMLElement): string | undefined {
+  if (element.id) {
+    const selector = `#${escapeCss(element.id)}`;
+    if (isUniqueSelectorFor(selector, element)) return selector;
+  }
+
+  for (const attr of SAFE_ATTRS) {
+    const val = element.getAttribute(attr);
+    if (!val) continue;
+
+    const selector = `[${attr}="${escapeCss(val)}"]`;
+    if (isUniqueSelectorFor(selector, element)) return selector;
+  }
+
+  if (element === document.documentElement) return "html";
+  if (element === document.body) return "body";
+
+  return undefined;
+}
+
+/**
+ * Build the element segment of a structural selector.
+ */
+function getStructuralSegment(element: HTMLElement): string {
+  const tag = element.tagName.toLowerCase();
+  const parent = element.parentElement;
+
+  if (!parent) return tag;
+
+  const siblings = Array.from(parent.children).filter(
+    (sibling) => sibling.tagName === element.tagName,
+  );
+
+  if (siblings.length <= 1) return tag;
+
+  return `${tag}:nth-of-type(${siblings.indexOf(element) + 1})`;
+}
+
+/**
  * Clamp a value between 0 and 1, or return undefined if invalid
  */
 export function clamp01(value: number | undefined): number | undefined {
@@ -29,48 +90,26 @@ export function clamp01(value: number | undefined): number | undefined {
 
 /**
  * Generate a CSS selector for an element
- * Prioritizes: id > data attributes > structural path
+ * Prioritizes unique IDs/data attributes, including on ancestors, then falls
+ * back to a full structural path. A non-unique selector is never returned.
  */
 export function generateSelector(element: HTMLElement): string | undefined {
-  // Try ID first (most reliable)
-  if (element.id) {
-    return `#${escapeCss(element.id)}`;
-  }
-
-  // Try safe data attributes
-  for (const attr of SAFE_ATTRS) {
-    const val = element.getAttribute(attr);
-    if (val) {
-      return `[${attr}="${escapeCss(val)}"]`;
-    }
-  }
-
-  // Fallback to structural path (less reliable but works)
   const parts: string[] = [];
-  let el: HTMLElement | null = element;
-  let depth = 0;
+  let current: HTMLElement | null = element;
 
-  while (el && depth < 4) {
-    const tag = el.tagName.toLowerCase();
-    const parent: HTMLElement | null = el.parentElement;
-    let selector = tag;
-
-    if (parent) {
-      const siblings = Array.from(parent.children).filter((sib) => {
-        return sib instanceof HTMLElement && el !== null && sib.tagName === el.tagName;
-      });
-      if (siblings.length > 1 && parent instanceof HTMLElement) {
-        const index = siblings.indexOf(el) + 1;
-        selector = `${tag}:nth-of-type(${index})`;
-      }
+  while (current) {
+    const stableSelector = getStableSelector(current);
+    if (stableSelector) {
+      const selector = [stableSelector, ...parts].join(" > ");
+      if (isUniqueSelectorFor(selector, element)) return selector;
     }
 
-    parts.unshift(selector);
-    el = parent;
-    depth += 1;
+    parts.unshift(getStructuralSegment(current));
+    current = current.parentElement;
   }
 
-  return parts.join(" > ") || undefined;
+  const selector = parts.join(" > ");
+  return selector && isUniqueSelectorFor(selector, element) ? selector : undefined;
 }
 
 /**
@@ -153,7 +192,7 @@ export function resolveAbsoluteX(item: Anchorable, docWidth: number): number {
 
   // Try anchor element first (most accurate)
   if (item.anchorSelector && item.anchorOffsetX !== undefined) {
-    const el = document.querySelector(item.anchorSelector) as HTMLElement | null;
+    const el = getUniqueElement(item.anchorSelector);
     if (el) {
       const rect = el.getBoundingClientRect();
       if (rect.width) {
@@ -180,7 +219,7 @@ export function resolveAbsoluteY(item: Anchorable, docHeight: number): number {
 
   // Try anchor element first (most accurate)
   if (item.anchorSelector && item.anchorOffsetY !== undefined) {
-    const el = document.querySelector(item.anchorSelector) as HTMLElement | null;
+    const el = getUniqueElement(item.anchorSelector);
     if (el) {
       const rect = el.getBoundingClientRect();
       if (rect.height) {
