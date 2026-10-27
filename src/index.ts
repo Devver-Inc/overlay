@@ -130,7 +130,6 @@ async function autoConfigure(): Promise<void> {
   if (!context?.projectId) return;
 
   const baseUrl = context.apiBaseUrl ?? DEVVER_API_BASE_URL;
-  // Read live so a permission change applies without redeploying the preview.
   const overlayAccessControl =
     context.overlayAccessControl ??
     (await fetch(`${baseUrl}/projects/${context.projectId}/overlay-access`)
