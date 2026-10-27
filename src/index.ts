@@ -115,27 +115,46 @@ const api: DevverOverlayAPI = {
 // Expose on global scope
 globalScope.DevverOverlay = api;
 
-// Auto-configure from injected window.__DEVVER__ script tag
-const __DEVVER__ = (globalScope as unknown as { __DEVVER__?: DevverScriptConfig }).__DEVVER__;
-if (__DEVVER__?.projectId) {
-  const baseUrl = __DEVVER__.apiBaseUrl ?? DEVVER_API_BASE_URL;
+// On a Devver preview the deploy agent serves the context at /__devver/context;
+// window.__DEVVER__ still works for manual embeds.
+async function loadPreviewContext(): Promise<DevverScriptConfig | undefined> {
+  const response = await fetch("/__devver/context").catch(() => undefined);
+  if (!response?.ok) return undefined;
+  const { projectId, organizationId, repo, ref } = await response.json();
+  return { projectId, organizationId, repo, branch: ref };
+}
+
+async function autoConfigure(): Promise<void> {
+  const injected = (globalScope as unknown as { __DEVVER__?: DevverScriptConfig }).__DEVVER__;
+  const context = injected?.projectId ? injected : await loadPreviewContext();
+  if (!context?.projectId) return;
+
+  const baseUrl = context.apiBaseUrl ?? DEVVER_API_BASE_URL;
+  const overlayAccessControl =
+    context.overlayAccessControl ??
+    (await fetch(`${baseUrl}/projects/${context.projectId}/overlay-access`)
+      .then((response) => (response.ok ? response.json() : undefined))
+      .catch(() => undefined));
+
   devverOverlay.configureComments({
     mode: "api",
     baseUrl,
-    projectId: __DEVVER__.projectId,
-    organizationId: __DEVVER__.organizationId,
-    repo: __DEVVER__.repo,
-    branch: __DEVVER__.branch,
+    projectId: context.projectId,
+    organizationId: context.organizationId,
+    repo: context.repo,
+    branch: context.branch,
     logto: {
       endpoint: DEVVER_LOGTO_ENDPOINT,
       appId: DEVVER_LOGTO_APP_ID,
       apiResource: baseUrl,
       authPortalUrl: getDefaultAuthPortalUrl(baseUrl),
-      ...__DEVVER__.logto,
+      ...context.logto,
     },
-    overlayAccessControl: __DEVVER__.overlayAccessControl,
+    overlayAccessControl,
   });
 }
+
+void autoConfigure();
 
 // ============================================
 // TYPE DECLARATIONS
